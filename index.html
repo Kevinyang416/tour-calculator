@@ -229,12 +229,12 @@ tr.foc td.lc { color: var(--grn); }
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const GRP_ITEMS = [
-  { key:'guide',  label:'導遊 Guide'             },
-  { key:'van',    label:'九座 Van / Transport'   },
-  { key:'ghotel', label:'導住 Guide Hotel'       },
-  { key:'foc',    label:'FOC',    isFOC: true    },
-  { key:'meal',   label:'司導誤餐費 Meal Allow.'  },
-  { key:'trans',  label:'導交通 Guide Transport'  },
+  { key:'guide',  label:'導遊 Guide'                        },
+  { key:'van',    label:'車輛 Vehicle', isVan: true         }, // editable label
+  { key:'ghotel', label:'導住 Guide Hotel'                  },
+  { key:'foc',    label:'FOC',          isFOC: true         },
+  { key:'meal',   label:'司導誤餐費 Meal Allow.'             },
+  { key:'trans',  label:'導交通 Guide Transport'            },
 ];
 const IND_ITEMS = [
   { key:'hotel',     label:'住宿 Hotel'          },
@@ -286,10 +286,9 @@ function buildTables(days) {
   // ── Group table ──
   let grpHTML = hdr;
 
-  GRP_ITEMS.forEach(({key, label, isFOC}, idx) => {
+  GRP_ITEMS.forEach(({key, label, isFOC, isVan}, idx) => {
     const rowCls = isFOC ? 'foc' : (idx%2===0 ? 'ev' : '');
     if (isFOC) {
-      // FOC row: RATE cell = Total B (read-only span), day cells = static label
       let dayCells = '';
       for(let d=0;d<n;d++) dayCells += `<td style="background:#f0fdf4;color:#86efac;text-align:center;font-size:.62rem;font-style:italic">= B</td>`;
       grpHTML += `<tr class="${rowCls}">
@@ -297,12 +296,31 @@ function buildTables(days) {
         <td class="rc"><span class="cv" id="foc-display">–</span></td>
         ${dayCells}
       </tr>`;
+    } else if (isVan) {
+      // Vehicle: editable label + numeric day cells
+      let dayCells = '';
+      for(let d=0;d<n;d++) {
+        dayCells += `<td><input class="ci" type="text" inputmode="numeric"
+          id="g_${key}_${d}" placeholder="0" oninput="calcTotals()"></td>`;
+      }
+      grpHTML += `<tr class="${rowCls}">
+        <td class="lc">
+          <input type="text" id="van-label"
+            value="九座 Van"
+            placeholder="車輛名稱"
+            style="border:1px dashed #cbd5e1;border-radius:4px;padding:2px 6px;
+                   font-family:Verdana,sans-serif;font-size:.72rem;font-weight:600;
+                   width:120px;background:#fffef0;"
+            title="可自由填寫車輛名稱">
+        </td>
+        <td class="rc" id="gr_${key}">–</td>
+        ${dayCells}
+      </tr>`;
     } else {
       let dayCells = '';
       for(let d=0;d<n;d++) {
         dayCells += `<td><input class="ci" type="text" inputmode="numeric"
-          id="g_${key}_${d}" placeholder="0"
-          oninput="calcTotals()"></td>`;
+          id="g_${key}_${d}" placeholder="0" oninput="calcTotals()"></td>`;
       }
       grpHTML += `<tr class="${rowCls}">
         <td class="lc">${label}</td>
@@ -338,17 +356,22 @@ function buildTables(days) {
   // ── Individual table ──
   let indHTML = hdr;
   IND_ITEMS.forEach(({key, label}, idx) => {
-    let dayCells = '';
-    for(let d=0;d<n;d++) {
-      dayCells += `<td><input class="ci" type="text" inputmode="numeric"
-        id="i_${key}_${d}" placeholder="0"
-        oninput="calcTotals()"></td>`;
+    if (key === 'entrance') {
+      // Entrance: rendered dynamically by buildEntranceRows(), placeholder only
+      indHTML += `<tbody id="entrance-tbody"></tbody>`;
+    } else {
+      let dayCells = '';
+      for(let d=0;d<n;d++) {
+        dayCells += `<td><input class="ci" type="text" inputmode="numeric"
+          id="i_${key}_${d}" placeholder="0"
+          oninput="calcTotals()"></td>`;
+      }
+      indHTML += `<tr class="${idx%2===0?'ev':''}">
+        <td class="lc">${label}</td>
+        <td class="rc" id="ir_${key}">–</td>
+        ${dayCells}
+      </tr>`;
     }
-    indHTML += `<tr class="${idx%2===0?'ev':''}">
-      <td class="lc">${label}</td>
-      <td class="rc" id="ir_${key}">–</td>
-      ${dayCells}
-    </tr>`;
   });
   let tBCells = '';
   for(let d=0;d<n;d++) tBCells += `<td id="id_tB_${d}">–</td>`;
@@ -358,9 +381,96 @@ function buildTables(days) {
   </tr>`;
 
   $('tbl-ind').innerHTML = indHTML;
+
+  // Build entrance rows (default 1 row)
+  if (!window.entranceRows || window.lastN !== n) {
+    window.entranceRows = [{ id: Date.now() }];
+  }
+  renderEntranceRows(n);
 }
 
-// ─── CALC TOTALS (called on every input — only updates text, never touches inputs) ───
+// ─── ENTRANCE MULTI-ROW ───────────────────────────────────────────────────────
+window.entranceRows = [{ id: 1 }];
+
+function renderEntranceRows(n) {
+  n = n || lastN;
+  const tbody = $('entrance-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  window.entranceRows.forEach((row, ri) => {
+    const isFirst = ri === 0;
+    const tr = document.createElement('tr');
+    tr.className = 'ev';
+    let dayCells = '';
+    for (let d = 0; d < n; d++) {
+      dayCells += `<td><input class="ci" type="text" inputmode="numeric"
+        id="ent_${row.id}_${d}" placeholder="0"
+        value="${row.vals && row.vals[d] !== undefined ? row.vals[d] : ''}"
+        oninput="onEntCell(this,${row.id},${d})"></td>`;
+    }
+    // label cell: name input + add/remove buttons
+    tr.innerHTML = `
+      <td class="lc" style="padding-left:11px;">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input type="text" id="ent_name_${row.id}"
+            value="${row.name||''}"
+            placeholder="門票名稱"
+            style="border:1px dashed #cbd5e1;border-radius:4px;padding:2px 6px;
+                   font-family:Verdana,sans-serif;font-size:.72rem;font-weight:600;
+                   width:100px;background:#fffef0;"
+            oninput="entranceRows[${ri}].name=this.value">
+          <button onclick="addEntranceRow()" title="新增門票"
+            style="background:#16a34a;color:#fff;border:none;border-radius:3px;
+                   width:20px;height:20px;cursor:pointer;font-size:.8rem;line-height:1;">+</button>
+          ${!isFirst ? `<button onclick="removeEntranceRow(${row.id})" title="移除此行"
+            style="background:#dc2626;color:#fff;border:none;border-radius:3px;
+                   width:20px;height:20px;cursor:pointer;font-size:.8rem;line-height:1;">−</button>` : ''}
+        </div>
+      </td>
+      <td class="rc" id="ent_tot_${row.id}">–</td>
+      ${dayCells}`;
+    tbody.appendChild(tr);
+  });
+  calcTotals();
+}
+
+function onEntCell(el, rowId, day) {
+  const row = window.entranceRows.find(r => r.id === rowId);
+  if (!row) return;
+  if (!row.vals) row.vals = {};
+  row.vals[day] = el.value;
+  calcTotals();
+}
+
+function addEntranceRow() {
+  window.entranceRows.push({ id: Date.now(), vals: {}, name: '' });
+  renderEntranceRows();
+}
+
+function removeEntranceRow(id) {
+  window.entranceRows = window.entranceRows.filter(r => r.id !== id);
+  renderEntranceRows();
+}
+
+function getEntranceTotals(n) {
+  const dayTots = Array(n).fill(0);
+  let grandTot = 0;
+  window.entranceRows.forEach(row => {
+    let rowTot = 0;
+    for (let d = 0; d < n; d++) {
+      const el = $(`ent_${row.id}_${d}`);
+      const v = el ? (parseFloat(el.value)||0) : (row.vals && parseFloat(row.vals[d])||0);
+      dayTots[d] += v;
+      rowTot += v;
+      grandTot += v;
+    }
+    const totEl = $(`ent_tot_${row.id}`);
+    if (totEl) totEl.textContent = rowTot ? fmt(rowTot) : '–';
+  });
+  return { dayTots, grandTot };
+}
+
+// ─── CALC TOTALS ──────────────────────────────────────────────────────────────
 function calcTotals() {
   const n   = lastN;
   const pax = fv('pax');
@@ -372,6 +482,7 @@ function calcTotals() {
   // ── B totals first (needed for FOC) ──
   const bDay = Array(n).fill(0);
   IND_ITEMS.forEach(({key}) => {
+    if (key === 'entrance') return; // handled separately
     let rowTot = 0;
     for(let d=0;d<n;d++){
       const v = num($(`i_${key}_${d}`)?.value);
@@ -380,6 +491,10 @@ function calcTotals() {
     const el = $(`ir_${key}`);
     if(el) el.textContent = rowTot ? fmt(rowTot) : '–';
   });
+
+  // entrance multi-rows
+  const { dayTots: entDay } = getEntranceTotals(n);
+  entDay.forEach((v,d) => bDay[d] += v);
   const totalB = bDay.reduce((s,v)=>s+v,0);
   // per-day total B
   for(let d=0;d<n;d++){
@@ -521,12 +636,13 @@ function doExport() {
   rows.push([]);
 
   rows.push(['GROUP SHARING (A)','TOTAL TWD',...dH]);
-  GRP_ITEMS.forEach(({key,label,isFOC})=>{
+  GRP_ITEMS.forEach(({key,label,isFOC,isVan})=>{
     if(isFOC){
       rows.push(['FOC (= Total B per pax)',totalB,...Array(n).fill('= B')]);
     } else {
+      const lbl = isVan ? (($('van-label')?.value)||'車輛 Vehicle') : label;
       const vals=Array.from({length:n},(_,d)=>num($(`g_${key}_${d}`)?.value));
-      rows.push([label,vals.reduce((s,v)=>s+v,0),...vals]);
+      rows.push([lbl,vals.reduce((s,v)=>s+v,0),...vals]);
     }
   });
   const gDay=Array(n).fill(0);
@@ -540,8 +656,20 @@ function doExport() {
 
   rows.push(['INDIVIDUAL (B) per pax','TOTAL PP',...dH]);
   IND_ITEMS.forEach(({key,label})=>{
-    const vals=Array.from({length:n},(_,d)=>num($(`i_${key}_${d}`)?.value));
-    rows.push([label,vals.reduce((s,v)=>s+v,0),...vals]);
+    if (key === 'entrance') {
+      // export each entrance row separately
+      window.entranceRows.forEach(row => {
+        const name = ($(`ent_name_${row.id}`)?.value) || row.name || '門票';
+        const vals = Array.from({length:n},(_,d)=>{
+          const el=$(`ent_${row.id}_${d}`);
+          return el ? (parseFloat(el.value)||0) : (parseFloat(row.vals?.[d])||0);
+        });
+        rows.push([name, vals.reduce((s,v)=>s+v,0), ...vals]);
+      });
+    } else {
+      const vals=Array.from({length:n},(_,d)=>num($(`i_${key}_${d}`)?.value));
+      rows.push([label,vals.reduce((s,v)=>s+v,0),...vals]);
+    }
   });
   rows.push(['Total (B) per pax',totalB]);
   rows.push([]);
@@ -580,8 +708,10 @@ function clearAll() {
   ['ref','pax','margin','fxrate','sellrate','srs-pax','srs-twin','srs-single','srs-nights']
     .forEach(id=>$(id).value='');
   delete $('srs-nights').dataset.touched;
-  // clear all cell inputs
   document.querySelectorAll('.ci').forEach(el=>el.value='');
+  const vl=$('van-label'); if(vl) vl.value='九座 Van';
+  window.entranceRows = [{ id: Date.now(), vals:{}, name:'' }];
+  renderEntranceRows();
   calcTotals();
 }
 
