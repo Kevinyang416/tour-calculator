@@ -172,6 +172,40 @@ tr.foc td.lc { color: var(--grn); }
   opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 999;
 }
 #toast.show { opacity: 1; }
+
+/* ── comparison table ── */
+.sh.teal { background: #0f766e; }
+.cmp-cfg {
+  padding: 12px 18px; background: #f0fdfa;
+  border-bottom: 1px solid #99f6e4;
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+}
+.cmp-cfg .pg input { border-color: #5eead4; width: 90px; }
+.cmp-add {
+  padding: 5px 12px; background: #0f766e; color: #fff;
+  border: none; border-radius: 5px; font-family: Verdana, sans-serif;
+  font-size: .72rem; font-weight: 700; cursor: pointer; align-self: flex-end;
+}
+.cmp-add:hover { opacity: .82; }
+.cmp-wrap { overflow-x: auto; }
+table.cmp { width: 100%; border-collapse: collapse; font-size: .74rem; }
+table.cmp th {
+  background: #134e4a; color: #fff;
+  padding: 7px 10px; text-align: center;
+  font-size: .62rem; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+}
+table.cmp th.lc { text-align: left; min-width: 140px; }
+table.cmp td { border-bottom: 1px solid var(--mid); padding: 6px 10px; text-align: right; }
+table.cmp td.lc { text-align: left; font-weight: 600; padding-left: 12px; }
+table.cmp tr.ev td { background: #f0fdfa; }
+table.cmp tr.sub-cmp td { background: #ccfbf1 !important; font-weight: 700; }
+.del-btn {
+  background: #fee2e2; color: #dc2626; border: none; border-radius: 3px;
+  font-size: .65rem; font-weight: 700; padding: 1px 6px; cursor: pointer;
+  font-family: Verdana, sans-serif;
+}
+.del-btn:hover { background: #fca5a5; }
+
 </style>
 </head>
 <body>
@@ -219,6 +253,26 @@ tr.foc td.lc { color: var(--grn); }
   <button class="btn btn-g" onclick="doExport()">📥 Export Excel</button>
   <button class="btn btn-o" onclick="clearAll()">🗑 Clear All</button>
 </div>
+
+<!-- ── MULTI-PAX COMPARISON ── -->
+<div class="sh teal" style="margin-top:8px;">
+  📊 MULTI-PAX COMPARISON — 多人數方案比較
+  <small>依不同人數自動重算報價</small>
+</div>
+<div class="cmp-cfg">
+  <div class="pg">
+    <label>付費人數 Paying Pax</label>
+    <input type="text" inputmode="numeric" id="cmp-pax-input" placeholder="e.g. 20" style="width:90px;">
+  </div>
+  <div class="pg">
+    <label>FOC 免費名額</label>
+    <input type="text" inputmode="numeric" id="cmp-foc-input" placeholder="e.g. 1" style="width:90px;">
+    <small>FOC不分攤費用</small>
+  </div>
+  <button class="cmp-add" onclick="addCmpRow()">+ 新增方案</button>
+  <div style="align-self:flex-end;font-size:.65rem;color:#0f766e;padding-bottom:4px;">預設 20+1、25+1、30+1</div>
+</div>
+<div class="cmp-wrap"><table class="cmp" id="cmp-table"></table></div>
 
 </div></div>
 <div id="toast"></div>
@@ -337,7 +391,7 @@ function buildTables(days) {
   }
   grpHTML += `
     <tr class="sub">
-      <td class="lc">共同費用 Sub-total</td>
+      <td class="lc">共同費用 Sub-total <span style="font-size:.58rem;color:var(--sky)">(含 FOC)</span></td>
       <td class="rc" id="gr_subtot">–</td>${subCells}
     </tr>
     <tr class="sub">
@@ -345,7 +399,7 @@ function buildTables(days) {
       <td class="rc" id="gr_pax">–</td>${paxCells}
     </tr>
     <tr class="tA">
-      <td class="lc">✦ Total (A) per pax</td>
+      <td class="lc">✦ Total (A) per pax <span style="font-size:.58rem;opacity:.7">(Sub-total ÷ 人數)</span></td>
       <td class="rc" id="gr_tA">–</td>${tACells}
     </tr>`;
 
@@ -504,7 +558,7 @@ function calcTotals() {
   const focEl = $('foc-display');
   if(focEl) focEl.textContent = totalB ? fmt(totalB) : '–';
 
-  // ── A totals (non-FOC) ──
+  // ── A totals (non-FOC group items) ──
   const gDay = Array(n).fill(0);
   GRP_ITEMS.filter(g=>!g.isFOC).forEach(({key}) => {
     let rowTot = 0;
@@ -515,37 +569,32 @@ function calcTotals() {
     const el = $(`gr_${key}`);
     if(el) el.textContent = rowTot ? fmt(rowTot) : '–';
   });
-  const sharedTot = gDay.reduce((s,v)=>s+v,0);
+  const nonFocTot = gDay.reduce((s,v)=>s+v,0);
 
-  // sub-total per day
+  // Sub-total = non-FOC group costs + FOC (= totalB)
+  const sharedTot = nonFocTot + totalB;
+
+  // sub-total per day (non-FOC only for day columns, FOC has no day breakdown)
   for(let d=0;d<n;d++){
     const el=$(`gd_sub_${d}`); if(el) el.textContent = gDay[d] ? fmt(gDay[d]) : '–';
   }
   const grSub=$('gr_subtot'); if(grSub) grSub.textContent = sharedTot ? fmt(sharedTot) : '–';
   const grPax=$('gr_pax');    if(grPax) grPax.textContent = pax || '–';
 
-  // Total A per pax = (sharedTot / pax) + FOC(=totalB)
-  const ppShared = pax ? sharedTot/pax : 0;
-  const totalA   = ppShared + totalB;
+  // Total (A) per pax = Sub-total ÷ 人數  (FOC already included in sub-total)
+  const totalA = pax ? sharedTot / pax : 0;
   const grTA=$('gr_tA'); if(grTA) grTA.textContent = totalA ? fmt(totalA) : '–';
   for(let d=0;d<n;d++){
-    const el=$(`gd_tA_${d}`); if(el) el.textContent='–'; // day-level not meaningful for A
+    const el=$(`gd_tA_${d}`); if(el) el.textContent='–';
   }
 
   // ── SRS ──
   calcSRS();
 
   // ── Pricing ──
-  const netPP     = totalA + totalB;  // (shared÷pax + FOC) + B  = shared÷pax + 2×B
-  // Wait: re-check. Total A = shared/pax + totalB (FOC).
-  // But Net should be: group shared per pax + individual per pax.
-  // FOC is a cost, shown as "= Total B" meaning its value equals Total B.
-  // Net = shared/pax + totalB(FOC) + totalB(indiv) would double-count.
-  //
-  // Correct: Net = shared/pax + totalB
-  // FOC = totalB is DISPLAY reference only, already included in totalB side.
-  // So total A displayed = shared/pax + totalB (for reference), but Net uses:
-  const netPP2    = ppShared + totalB; // shared group costs per pax + all individual per pax
+  // Net = Total(A) per pax + Total(B) per pax
+  // A already includes FOC÷pax, B is individual per pax
+  const netPP2    = totalA + totalB;
   const selling   = netPP2*(1+margin/100);
   const profitPP  = selling - netPP2;
   const selGrp    = selling*pax;
@@ -570,8 +619,10 @@ function calcTotals() {
   ).join('');
 
   // store snapshot for export
-  window._snap = { n, pax, margin, sellFx, sharedTot, ppShared, totalA, totalB, netPP:netPP2,
+  window._snap = { n, pax, margin, sellFx, sharedTot, totalA, totalB, netPP:netPP2,
     selling, profitPP, selGrp, profitPG, selUSD, grpUSD, bDay, gDay };
+
+  renderCmp();
 }
 
 // ─── SRS ──────────────────────────────────────────────────────────────────────
@@ -632,6 +683,7 @@ function onDateChange() {
 
   buildTables(days);
   calcTotals();
+  renderCmp();
 }
 
 // ─── EXPORT ───────────────────────────────────────────────────────────────────
@@ -747,6 +799,113 @@ $('srs-nights').addEventListener('input', function(){ this.dataset.touched='1'; 
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 onDateChange();
+// ─── MULTI-PAX COMPARISON ─────────────────────────────────────────────────────
+// Logic (CORRECTED):
+//   sharedTot = nonFocGroupCosts + FOC(=totalB)  [from _snap]
+//   Total(A) per pax = sharedTot / payPax
+//   Net per paying pax = Total(A) + Total(B) = sharedTot/payPax + totalB
+//   Selling = Net * (1 + margin%)
+
+let cmpScenarios = [
+  { id:1, payPax:20, foc:1 },
+  { id:2, payPax:25, foc:1 },
+  { id:3, payPax:30, foc:1 },
+];
+
+function addCmpRow() {
+  const p = parseInt($('cmp-pax-input').value) || 0;
+  const f = parseInt($('cmp-foc-input').value) || 0;
+  if (!p) { toast('請輸入付費人數'); return; }
+  cmpScenarios.push({ id: Date.now(), payPax: p, foc: f });
+  $('cmp-pax-input').value = '';
+  $('cmp-foc-input').value = '';
+  renderCmp();
+}
+
+function removeCmpRow(id) {
+  cmpScenarios = cmpScenarios.filter(s => s.id !== id);
+  renderCmp();
+}
+
+function renderCmp() {
+  const snap = window._snap;
+  const tbl  = $('cmp-table');
+  if (!tbl) return;
+  if (!snap || (!snap.sharedTot && !snap.totalB)) {
+    tbl.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:14px;color:var(--muted);font-size:.72rem;">請先填寫費用資料，比較表將自動更新</td></tr>';
+    return;
+  }
+
+  const { sharedTot, totalB, margin, sellFx } = snap;
+  const marginMult = 1 + (margin / 100);
+
+  let html = `<thead><tr>
+    <th class="lc">方案</th>
+    <th>付費人數</th>
+    <th>FOC</th>
+    <th>總人數</th>
+    <th>Sub-total (含FOC)</th>
+    <th>Total (A) per pax</th>
+    <th>Total (B) per pax</th>
+    <th>Net (P/P) TWD</th>
+    <th>Selling (P/P) TWD</th>
+    <th>Selling (P/P) USD</th>
+    <th style="background:#1a5c57;width:36px;"></th>
+  </tr></thead><tbody>`;
+
+  cmpScenarios.forEach((sc, idx) => {
+    const { payPax, foc } = sc;
+    // sharedTot already includes FOC (=totalB for the BASE pax in main calc)
+    // For comparison: FOC cost = totalB * foc (absorb B cost per FOC person)
+    // sharedTot for this scenario = nonFocGroupCosts + (totalB * foc)
+    const nonFocGroup = sharedTot - snap.totalB;  // extract original FOC amount
+    const focCost     = totalB * foc;              // FOC cost for this scenario's foc count
+    const scenarioShared = nonFocGroup + focCost;  // recalculated sub-total
+    const totalA_sc   = payPax ? scenarioShared / payPax : 0;
+    const netPP       = totalA_sc + totalB;
+    const sellPP      = netPP * marginMult;
+    const sellUSD     = sellFx ? sellPP / sellFx : 0;
+    const totalPax    = payPax + foc;
+    const cls         = idx % 2 === 0 ? 'ev' : '';
+
+    html += `<tr class="${cls}">
+      <td class="lc" style="font-weight:700;color:#0f766e;">${payPax}+${foc} FOC</td>
+      <td>${payPax}</td>
+      <td style="color:var(--grn);font-weight:700;">${foc}</td>
+      <td style="font-weight:700;">${totalPax}</td>
+      <td>${scenarioShared ? fmt(scenarioShared) : '–'}</td>
+      <td>${totalA_sc ? fmt(totalA_sc) : '–'}</td>
+      <td>${fmt(totalB)}</td>
+      <td style="font-weight:700;">${netPP ? fmt(netPP) : '–'}</td>
+      <td style="font-weight:700;color:var(--blue);">${sellPP ? fmt(sellPP) : '–'}</td>
+      <td style="font-weight:700;color:var(--grn);">${sellFx && sellPP ? 'USD '+fmtD(sellUSD) : '–'}</td>
+      <td style="text-align:center;"><button class="del-btn" onclick="removeCmpRow(${sc.id})">✕</button></td>
+    </tr>`;
+  });
+
+  if (cmpScenarios.length > 1) {
+    const best = cmpScenarios.reduce((b, sc) => {
+      const nonFocGroup = sharedTot - snap.totalB;
+      const focCost = totalB * sc.foc;
+      const sell = sc.payPax ? ((nonFocGroup + focCost)/sc.payPax + totalB) * marginMult : Infinity;
+      const bSell = b.payPax ? ((nonFocGroup + totalB*b.foc)/b.payPax + totalB) * marginMult : Infinity;
+      return sell < bSell ? sc : b;
+    }, cmpScenarios[0]);
+    const nonFocGroup = sharedTot - snap.totalB;
+    const bestSell = best.payPax ? ((nonFocGroup + totalB*best.foc)/best.payPax + totalB)*marginMult : 0;
+    html += `<tr class="sub-cmp">
+      <td class="lc" colspan="7">最優惠方案 → ${best.payPax}+${best.foc} FOC</td>
+      <td colspan="2" style="text-align:right;font-size:.7rem;">最低 Selling (P/P)</td>
+      <td style="font-weight:700;color:#0f766e;">${fmt(bestSell)} TWD</td>
+      <td></td>
+    </tr>`;
+  }
+
+  html += '</tbody>';
+  tbl.innerHTML = html;
+}
+
+
 </script>
 </body>
 </html>
