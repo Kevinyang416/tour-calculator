@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tour Cost Calculator</title>
+<style>
+:root {
+  --navy:   #0f2340;
+  --blue:   #1e4d8c;
+  --sky:    #3b82c4;
+  --ice:    #dbeafe;
+  --gold:   #f59e0b;
+  --goldlt: #fef3c7;
+  --grn:    #16a34a;
+  --grey:   #f8fafc;
+  --mid:    #e2e8f0;
+  --text:   #1e293b;
+  --muted:  #64748b;
+  --white:  #ffffff;
+  --purple: #7c3aed;
+  --purplt: #ede9fe;
+  --radius: 10px;
+  --shadow: 0 4px 24px rgba(15,35,64,.13);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Verdana, sans-serif;
+  background: #e8eff8;
+  color: var(--text);
+  min-height: 100vh;
+  padding: 20px 12px 60px;
+}
+.wrap { max-width: 1160px; margin: 0 auto; }
+.card { background: var(--white); box-shadow: var(--shadow); border-radius: var(--radius); overflow: hidden; }
+
+/* header */
+.hdr {
+  background: var(--navy); color: #fff;
+  padding: 16px 22px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.hdr h1 { font-size: 1.1rem; font-weight: 700; }
+.hdr p  { font-size: .65rem; opacity: .5; margin-top: 2px; }
+.badge  { background: var(--gold); color: var(--navy); font-size: .66rem; font-weight: 700; padding: 3px 11px; border-radius: 20px; }
+
+/* section header */
+.sh {
+  background: var(--blue); color: #fff;
+  font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+  padding: 6px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sh small { font-weight: 400; opacity: .6; font-size: .64rem; letter-spacing: 0; }
+.sh.pur { background: var(--purple); }
+
+/* param bar */
+.pbar {
+  padding: 11px 18px; background: var(--grey);
+  border-bottom: 1px solid var(--mid);
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
+}
+.pg { display: flex; flex-direction: column; gap: 3px; }
+.pg label { font-size: .57rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.pg input {
+  padding: 5px 8px; border: 1.5px solid var(--mid); border-radius: 5px;
+  font-family: Verdana, sans-serif; font-size: .8rem;
+  background: #fff; color: var(--text); width: 105px;
+}
+.pg input.wide { width: 168px; }
+.pg input:focus { outline: none; border-color: var(--sky); }
+.pg small { font-size: .55rem; color: var(--muted); }
+
+/* date bar */
+.dbar {
+  padding: 8px 18px; background: #eef4fb;
+  border-bottom: 1px solid var(--mid);
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.dbar label { font-size: .6rem; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+.dbar input[type=date] {
+  padding: 4px 7px; border: 1.5px solid var(--mid); border-radius: 5px;
+  font-family: Verdana, sans-serif; font-size: .76rem; background: #fff;
+}
+.dbar input[type=date]:focus { outline: none; border-color: var(--sky); }
+#days-badge { background: var(--navy); color: #fff; font-size: .7rem; font-weight: 700; padding: 3px 11px; border-radius: 20px; }
+
+/* tables */
+.twrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .72rem; }
+th {
+  background: var(--navy); color: #fff;
+  padding: 6px 7px; text-align: center;
+  font-size: .6rem; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+}
+th.lc { text-align: left; min-width: 158px; }
+th.rc { min-width: 78px; background: #162f54; }
+th.dc { min-width: 70px; }
+td { border-bottom: 1px solid var(--mid); padding: 4px 6px; text-align: right; }
+td.lc { text-align: left; font-weight: 600; padding-left: 11px; }
+td.rc { background: #e8f0fb; font-weight: 700; color: var(--navy); }
+tr.ev td { background: #f8fafc; }
+tr.ev td.rc { background: #ddeaf8; }
+tr.sub td { background: var(--ice) !important; font-weight: 700; }
+tr.sub td.rc { background: #b8d8f4 !important; }
+tr.tA td { background: #e0eeff !important; font-weight: 700; border-top: 2px solid var(--sky); }
+tr.tB td { background: var(--goldlt) !important; font-weight: 700; border-top: 2px solid var(--gold); }
+tr.foc td { background: #f0fdf4 !important; }
+tr.foc td.rc { background: #bbf7d0 !important; color: var(--grn); }
+tr.foc td.lc { color: var(--grn); }
+
+/* THE KEY FIX: inputs are built once, never replaced */
+.ci {
+  width: 62px; padding: 3px 5px;
+  border: 1px solid #cbd5e1; border-radius: 4px;
+  font-family: Verdana, sans-serif; font-size: .72rem;
+  text-align: right; background: #fff;
+}
+.ci:focus { outline: none; border-color: var(--sky); background: #eff8ff; }
+
+/* computed (read-only) display */
+.cv {
+  display: inline-block; min-width: 50px;
+  padding: 3px 5px; border-radius: 4px;
+  font-size: .72rem; font-weight: 700;
+  color: var(--grn); background: #f0fdf4;
+  border: 1px dashed #86efac; text-align: right;
+}
+
+/* SRS */
+.srs-in {
+  padding: 11px 18px; background: var(--purplt);
+  border-bottom: 1px solid #ddd6fe;
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
+}
+.srs-in .pg input { border-color: #c4b5fd; }
+.srs-res { display: flex; flex-wrap: wrap; background: #f5f3ff; border-bottom: 1px solid #ddd6fe; }
+.sc { padding: 10px 14px; border-right: 1px solid #ddd6fe; min-width: 140px; flex: 1; }
+.sc .sl { font-size: .57rem; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+.sc .sv { font-size: .95rem; font-weight: 700; color: var(--purple); }
+.sc .sv.big { font-size: 1.2rem; color: #5b21b6; }
+.srs-fml { font-size: .61rem; color: #6d28d9; padding: 5px 18px 7px; background: #f5f3ff; border-bottom: 1px solid #ddd6fe; font-style: italic; }
+
+/* pricing */
+.pgrid { display: flex; flex-wrap: wrap; border-top: 3px solid var(--navy); }
+.pc { padding: 12px 14px; border-right: 1px solid var(--mid); border-bottom: 1px solid var(--mid); min-width: 112px; flex: 1; }
+.pl { font-size: .57rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+.pv { font-size: .9rem; font-weight: 600; color: var(--navy); }
+.pv.big  { font-size: 1.25rem; font-weight: 700; color: var(--blue); }
+.pv.gold { color: var(--gold); font-weight: 700; }
+.pv.grn  { color: var(--grn);  font-weight: 700; }
+
+/* actions */
+.acts {
+  padding: 10px 18px; display: flex; gap: 8px; flex-wrap: wrap;
+  border-top: 1px solid var(--mid); background: var(--grey);
+}
+.btn {
+  padding: 7px 14px; border: none; border-radius: 5px;
+  font-family: Verdana, sans-serif; font-size: .72rem; font-weight: 700;
+  cursor: pointer;
+}
+.btn-p { background: var(--blue); color: #fff; }
+.btn-g { background: var(--gold); color: var(--navy); }
+.btn-o { background: #fff; color: var(--navy); border: 1.5px solid var(--mid); }
+.btn:hover { opacity: .82; }
+
+#toast {
+  position: fixed; bottom: 20px; right: 16px;
+  background: var(--navy); color: #fff;
+  padding: 8px 14px; border-radius: 6px; font-size: .72rem;
+  opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 999;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+
+<div class="hdr">
+  <div><h1>🗺 Tour Cost Calculator</h1><p>Taiwan FIT / Group — Day-by-Day Costing</p></div>
+  <span class="badge" id="ref-badge">New Quote</span>
+</div>
+
+<div class="sh">⚙ BASIC PARAMETERS</div>
+<div class="pbar">
+  <div class="pg"><label>Ref / 行程名</label><input class="wide" type="text" id="ref" placeholder="e.g. Rakso #1070246"></div>
+  <div class="pg"><label>人數 Pax</label><input type="text" inputmode="numeric" id="pax" placeholder="0"><small>Min pax to confirm</small></div>
+  <div class="pg"><label>Margin %</label><input type="text" inputmode="numeric" id="margin" placeholder="0"><small>10 = 110%</small></div>
+  <div class="pg"><label>現在匯率 TWD/USD</label><input type="text" inputmode="numeric" id="fxrate" placeholder="0"></div>
+  <div class="pg"><label>賣出匯率 Sell Rate</label><input type="text" inputmode="numeric" id="sellrate" placeholder="0"></div>
+</div>
+
+<div class="dbar">
+  <label>出發日</label><input type="date" id="start-date" value="2026-10-28">
+  <label>結束日</label><input type="date"  id="end-date"  value="2026-11-01">
+  <span id="days-badge">5 Days / 4 Nights</span>
+</div>
+
+<div class="sh">A &nbsp;GROUP SHARING ITEMS <small>費用總額 ÷ 人數 &nbsp;|&nbsp; FOC = Total (B) 自動連動</small></div>
+<div class="twrap"><table id="tbl-grp"></table></div>
+
+<div class="sh" style="margin-top:1px">B &nbsp;INDIVIDUAL ITEMS — Per Pax <small>每人費用</small></div>
+<div class="twrap"><table id="tbl-ind"></table></div>
+
+<div class="sh pur" style="margin-top:1px">🛏 SINGLE ROOM SUPPLEMENT (SRS) <small>以 TWN 雙人房價計算差額</small></div>
+<div class="srs-in">
+  <div class="pg"><label>SRS 人數</label><input type="text" inputmode="numeric" id="srs-pax" placeholder="0"><small>需要單房的旅客數</small></div>
+  <div class="pg"><label>TWN 雙人房 / 晚</label><input type="text" inputmode="numeric" id="srs-twin" placeholder="0"><small>TWD / room / night</small></div>
+  <div class="pg"><label>SGL 單人房 / 晚</label><input type="text" inputmode="numeric" id="srs-single" placeholder="0"><small>TWD / room / night</small></div>
+  <div class="pg"><label>晚數 Nights</label><input type="text" inputmode="numeric" id="srs-nights" placeholder="0"><small>自動帶入，可手動覆蓋</small></div>
+</div>
+<div class="srs-res" id="srs-res"></div>
+<div class="srs-fml" id="srs-fml"></div>
+
+<div class="sh" style="margin-top:1px">💰 PRICING SUMMARY (A) + (B)</div>
+<div class="pgrid" id="pgrid"></div>
+
+<div class="acts">
+  <button class="btn btn-p" onclick="calcTotals()">🔄 Recalculate</button>
+  <button class="btn btn-g" onclick="doExport()">📥 Export Excel</button>
+  <button class="btn btn-o" onclick="clearAll()">🗑 Clear All</button>
+</div>
+
+</div></div>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const GRP_ITEMS = [
+  { key:'guide',  label:'導遊 Guide'             },
+  { key:'van',    label:'九座 Van / Transport'   },
+  { key:'ghotel', label:'導住 Guide Hotel'       },
+  { key:'foc',    label:'FOC',    isFOC: true    },
+  { key:'meal',   label:'司導誤餐費 Meal Allow.'  },
+  { key:'trans',  label:'導交通 Guide Transport'  },
+];
+const IND_ITEMS = [
+  { key:'hotel',     label:'住宿 Hotel'          },
+  { key:'bkfast',    label:'早餐 Breakfast'      },
+  { key:'lunch',     label:'午餐 Lunch'          },
+  { key:'dinner',    label:'晚餐 Dinner'         },
+  { key:'entrance',  label:'門票 Entrance Fees'  },
+  { key:'insurance', label:'保險 Insurance'      },
+];
+
+const TW = ['日','一','二','三','四','五','六'];
+const $ = id => document.getElementById(id);
+const fv = id => parseFloat($(id).value) || 0;
+const sv = id => ($(id).value||'').trim();
+const num = v => parseFloat(v)||0;
+const fmt = v => v ? Number(v).toLocaleString('en-US',{maximumFractionDigits:0}) : '–';
+const fmtD= v => Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+// ─── DATE HELPERS ─────────────────────────────────────────────────────────────
+function getDays() {
+  const s=new Date($('start-date').value), e=new Date($('end-date').value);
+  if(isNaN(s)||isNaN(e)||e<s) return [];
+  const out=[]; let c=new Date(s);
+  while(c<=e){out.push(new Date(c));c.setDate(c.getDate()+1);}
+  return out;
+}
+
+// ─── TABLE BUILD (called once per date change) ────────────────────────────────
+// All inputs get permanent IDs so we never recreate them.
+// input id format:  g_{key}_{day}   i_{key}_{day}
+
+let lastN = 0; // track current number of day columns
+
+function buildTables(days) {
+  const n = days.length;
+  lastN = n;
+
+  function dayTH(d, i) {
+    return `<th class="dc">Day ${i+1}<br>
+      <span style="font-weight:400;opacity:.75;font-size:.57rem">
+        ${d.getMonth()+1}/${d.getDate()} 星期${TW[d.getDay()]}
+      </span></th>`;
+  }
+  const hdr = `<tr>
+    <th class="lc">ITEM</th><th class="rc">RATE / TOTAL</th>
+    ${days.map((d,i)=>dayTH(d,i)).join('')}
+  </tr>`;
+
+  // ── Group table ──
+  let grpHTML = hdr;
+
+  GRP_ITEMS.forEach(({key, label, isFOC}, idx) => {
+    const rowCls = isFOC ? 'foc' : (idx%2===0 ? 'ev' : '');
+    if (isFOC) {
+      // FOC row: RATE cell = Total B (read-only span), day cells = static label
+      let dayCells = '';
+      for(let d=0;d<n;d++) dayCells += `<td style="background:#f0fdf4;color:#86efac;text-align:center;font-size:.62rem;font-style:italic">= B</td>`;
+      grpHTML += `<tr class="${rowCls}">
+        <td class="lc">FOC <span style="background:#bbf7d0;color:var(--grn);font-size:.53rem;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px">= Total (B)</span></td>
+        <td class="rc"><span class="cv" id="foc-display">–</span></td>
+        ${dayCells}
+      </tr>`;
+    } else {
+      let dayCells = '';
+      for(let d=0;d<n;d++) {
+        dayCells += `<td><input class="ci" type="text" inputmode="numeric"
+          id="g_${key}_${d}" placeholder="0"
+          oninput="calcTotals()"></td>`;
+      }
+      grpHTML += `<tr class="${rowCls}">
+        <td class="lc">${label}</td>
+        <td class="rc" id="gr_${key}">–</td>
+        ${dayCells}
+      </tr>`;
+    }
+  });
+
+  // Sub-total, Pax, Total A rows
+  let subCells='', paxCells='', tACells='';
+  for(let d=0;d<n;d++){
+    subCells += `<td class="rc" id="gd_sub_${d}">–</td>`;
+    paxCells += `<td style="background:var(--ice);color:#aaa;text-align:center">–</td>`;
+    tACells  += `<td id="gd_tA_${d}">–</td>`;
+  }
+  grpHTML += `
+    <tr class="sub">
+      <td class="lc">共同費用 Sub-total</td>
+      <td class="rc" id="gr_subtot">–</td>${subCells}
+    </tr>
+    <tr class="sub">
+      <td class="lc">人數 (Pax)</td>
+      <td class="rc" id="gr_pax">–</td>${paxCells}
+    </tr>
+    <tr class="tA">
+      <td class="lc">✦ Total (A) per pax</td>
+      <td class="rc" id="gr_tA">–</td>${tACells}
+    </tr>`;
+
+  $('tbl-grp').innerHTML = grpHTML;
+
+  // ── Individual table ──
+  let indHTML = hdr;
+  IND_ITEMS.forEach(({key, label}, idx) => {
+    let dayCells = '';
+    for(let d=0;d<n;d++) {
+      dayCells += `<td><input class="ci" type="text" inputmode="numeric"
+        id="i_${key}_${d}" placeholder="0"
+        oninput="calcTotals()"></td>`;
+    }
+    indHTML += `<tr class="${idx%2===0?'ev':''}">
+      <td class="lc">${label}</td>
+      <td class="rc" id="ir_${key}">–</td>
+      ${dayCells}
+    </tr>`;
+  });
+  let tBCells = '';
+  for(let d=0;d<n;d++) tBCells += `<td id="id_tB_${d}">–</td>`;
+  indHTML += `<tr class="tB">
+    <td class="lc">✦ Total (B) per pax</td>
+    <td class="rc" id="ir_tB">–</td>${tBCells}
+  </tr>`;
+
+  $('tbl-ind').innerHTML = indHTML;
+}
+
+// ─── CALC TOTALS (called on every input — only updates text, never touches inputs) ───
+function calcTotals() {
+  const n   = lastN;
+  const pax = fv('pax');
+  const margin  = fv('margin');
+  const sellFx  = fv('sellrate');
+
+  $('ref-badge').textContent = sv('ref') || 'New Quote';
+
+  // ── B totals first (needed for FOC) ──
+  const bDay = Array(n).fill(0);
+  IND_ITEMS.forEach(({key}) => {
+    let rowTot = 0;
+    for(let d=0;d<n;d++){
+      const v = num($(`i_${key}_${d}`)?.value);
+      bDay[d] += v; rowTot += v;
+    }
+    const el = $(`ir_${key}`);
+    if(el) el.textContent = rowTot ? fmt(rowTot) : '–';
+  });
+  const totalB = bDay.reduce((s,v)=>s+v,0);
+  // per-day total B
+  for(let d=0;d<n;d++){
+    const el=$(`id_tB_${d}`); if(el) el.textContent = bDay[d] ? fmt(bDay[d]) : '–';
+  }
+  const irTB = $('ir_tB'); if(irTB) irTB.textContent = totalB ? fmt(totalB) : '–';
+
+  // FOC display = Total B
+  const focEl = $('foc-display');
+  if(focEl) focEl.textContent = totalB ? fmt(totalB) : '–';
+
+  // ── A totals (non-FOC) ──
+  const gDay = Array(n).fill(0);
+  GRP_ITEMS.filter(g=>!g.isFOC).forEach(({key}) => {
+    let rowTot = 0;
+    for(let d=0;d<n;d++){
+      const v = num($(`g_${key}_${d}`)?.value);
+      gDay[d] += v; rowTot += v;
+    }
+    const el = $(`gr_${key}`);
+    if(el) el.textContent = rowTot ? fmt(rowTot) : '–';
+  });
+  const sharedTot = gDay.reduce((s,v)=>s+v,0);
+
+  // sub-total per day
+  for(let d=0;d<n;d++){
+    const el=$(`gd_sub_${d}`); if(el) el.textContent = gDay[d] ? fmt(gDay[d]) : '–';
+  }
+  const grSub=$('gr_subtot'); if(grSub) grSub.textContent = sharedTot ? fmt(sharedTot) : '–';
+  const grPax=$('gr_pax');    if(grPax) grPax.textContent = pax || '–';
+
+  // Total A per pax = (sharedTot / pax) + FOC(=totalB)
+  const ppShared = pax ? sharedTot/pax : 0;
+  const totalA   = ppShared + totalB;
+  const grTA=$('gr_tA'); if(grTA) grTA.textContent = totalA ? fmt(totalA) : '–';
+  for(let d=0;d<n;d++){
+    const el=$(`gd_tA_${d}`); if(el) el.textContent='–'; // day-level not meaningful for A
+  }
+
+  // ── SRS ──
+  calcSRS();
+
+  // ── Pricing ──
+  const netPP     = totalA + totalB;  // (shared÷pax + FOC) + B  = shared÷pax + 2×B
+  // Wait: re-check. Total A = shared/pax + totalB (FOC).
+  // But Net should be: group shared per pax + individual per pax.
+  // FOC is a cost, shown as "= Total B" meaning its value equals Total B.
+  // Net = shared/pax + totalB(FOC) + totalB(indiv) would double-count.
+  //
+  // Correct: Net = shared/pax + totalB
+  // FOC = totalB is DISPLAY reference only, already included in totalB side.
+  // So total A displayed = shared/pax + totalB (for reference), but Net uses:
+  const netPP2    = ppShared + totalB; // shared group costs per pax + all individual per pax
+  const selling   = netPP2*(1+margin/100);
+  const profitPP  = selling - netPP2;
+  const selGrp    = selling*pax;
+  const profitPG  = profitPP*pax;
+  const selUSD    = sellFx ? selling/sellFx : 0;
+  const grpUSD    = sellFx ? selGrp/sellFx : 0;
+
+  const pcells = [
+    { l:'Net Rate (P/P)',        v: fmt(netPP2),              c:'big'  },
+    { l:'Margin',                v: margin ? margin+'%':'–',  c:''     },
+    { l:'Selling Price (P/P)',   v: selling ? fmt(selling):'–', c:'big' },
+    { l:'Profit (P/P) TWD',     v: fmt(profitPP),            c:'gold' },
+    { l:'Sell Rate TWD/USD',    v: sellFx ? sellFx.toFixed(1):'–', c:'' },
+    { l:'≡',                    v: '=',                      c:''     },
+    { l:'Selling (P/P) USD',    v: sellFx ? 'USD '+fmtD(selUSD):'–', c:'grn' },
+    { l:'Profit (Group) TWD',   v: fmt(profitPG),            c:'grn'  },
+    { l:'Selling Total (Group)',v: selGrp ? fmt(selGrp):'–', c:'big'  },
+    { l:'Group Total USD',      v: sellFx ? 'USD '+fmtD(grpUSD):'–', c:'grn' },
+  ];
+  $('pgrid').innerHTML = pcells.map(c=>
+    `<div class="pc"><div class="pl">${c.l}</div><div class="pv ${c.c}">${c.v}</div></div>`
+  ).join('');
+
+  // store snapshot for export
+  window._snap = { n, pax, margin, sellFx, sharedTot, ppShared, totalA, totalB, netPP:netPP2,
+    selling, profitPP, selGrp, profitPG, selUSD, grpUSD, bDay, gDay };
+}
+
+// ─── SRS ──────────────────────────────────────────────────────────────────────
+function calcSRS() {
+  const srsPax = fv('srs-pax');
+  const twnR   = fv('srs-twin');
+  const sglR   = fv('srs-single');
+  const nights = fv('srs-nights');
+  const twnPP  = twnR/2;
+  const diff   = sglR - twnPP;
+  const srsPP  = diff * nights;
+  const srsTotal = srsPP * srsPax;
+
+  const res=$('srs-res'), frm=$('srs-fml');
+  if(!srsPax||(!twnR&&!sglR)){
+    res.innerHTML=`<div class="sc" style="flex:1"><div class="sl">STATUS</div><div class="sv" style="color:var(--muted)">請輸入 SRS 人數及房價</div></div>`;
+    frm.textContent='公式：SGL − (TWN ÷ 2) × 晚數 = SRS per pax';
+    return;
+  }
+  const cells=[
+    {l:'TWN ÷ 2 (每人/晚)',          v:fmt(twnPP)+' TWD'},
+    {l:'SGL (每人/晚)',               v:fmt(sglR)+' TWD'},
+    {l:'差額 per pax per night',      v:fmt(diff)+' TWD'},
+    {l:`SRS per pax (${nights} 晚)`, v:`<span class="big">${fmt(srsPP)}</span> TWD`},
+    {l:'SRS 人數',                    v:srsPax+' pax'},
+    {l:'SRS 總差額',                  v:`<span class="big">${fmt(srsTotal)}</span> TWD`},
+  ];
+  res.innerHTML=cells.map(c=>`<div class="sc"><div class="sl">${c.l}</div><div class="sv">${c.v}</div></div>`).join('');
+  frm.textContent=`公式：SGL ${fmt(sglR)} − (TWN ${fmt(twnR)} ÷ 2 = ${fmt(twnPP)}) = ${fmt(diff)} TWD/晚 × ${nights} 晚 = 每位單房旅客另加 TWD ${fmt(srsPP)}`;
+}
+
+// ─── DATE CHANGE → REBUILD TABLES ────────────────────────────────────────────
+function onDateChange() {
+  const days = getDays();
+  const n    = days.length;
+  if(!n) return;
+  const nights = n-1;
+  $('days-badge').textContent = `${n} Days / ${nights} Night${nights!==1?'s':''}`;
+
+  // Auto-set SRS nights if not manually touched
+  if(!$('srs-nights').dataset.touched) $('srs-nights').value = nights || '';
+
+  buildTables(days);
+  calcTotals();
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+function doExport() {
+  calcTotals();
+  const s = window._snap; if(!s) return;
+  const {n,pax,margin,sellFx,sharedTot,totalB,netPP,selling,profitPP,selGrp,profitPG,selUSD,grpUSD} = s;
+  const days = getDays();
+  const dH = days.map((_,i)=>`Day ${i+1}`);
+  const srsPax=fv('srs-pax'),twnR=fv('srs-twin'),sglR=fv('srs-single'),srsNt=fv('srs-nights');
+  const srsPP=(sglR-twnR/2)*srsNt, srsTotal=srsPP*srsPax;
+
+  const rows=[];
+  rows.push([sv('ref')||'Tour Cost Sheet']);
+  rows.push([`Pax: ${pax}`,`Margin: ${margin}%`,`Sell Rate: ${sellFx}`,`Days: ${n}`]);
+  rows.push([]);
+
+  rows.push(['GROUP SHARING (A)','TOTAL TWD',...dH]);
+  GRP_ITEMS.forEach(({key,label,isFOC})=>{
+    if(isFOC){
+      rows.push(['FOC (= Total B per pax)',totalB,...Array(n).fill('= B')]);
+    } else {
+      const vals=Array.from({length:n},(_,d)=>num($(`g_${key}_${d}`)?.value));
+      rows.push([label,vals.reduce((s,v)=>s+v,0),...vals]);
+    }
+  });
+  const gDay=Array(n).fill(0);
+  GRP_ITEMS.filter(g=>!g.isFOC).forEach(({key})=>{
+    Array.from({length:n},(_,d)=>num($(`g_${key}_${d}`)?.value)).forEach((v,d)=>gDay[d]+=v);
+  });
+  rows.push(['共同費用 Sub-total',sharedTot,...gDay]);
+  rows.push(['人數 (Pax)',pax]);
+  rows.push(['Total (A) per pax',s.totalA]);
+  rows.push([]);
+
+  rows.push(['INDIVIDUAL (B) per pax','TOTAL PP',...dH]);
+  IND_ITEMS.forEach(({key,label})=>{
+    const vals=Array.from({length:n},(_,d)=>num($(`i_${key}_${d}`)?.value));
+    rows.push([label,vals.reduce((s,v)=>s+v,0),...vals]);
+  });
+  rows.push(['Total (B) per pax',totalB]);
+  rows.push([]);
+
+  if(srsPax){
+    rows.push(['SRS — 單房差']);
+    rows.push(['TWN Rate/night',twnR,'TWD']);
+    rows.push(['SGL Rate/night',sglR,'TWD']);
+    rows.push(['差額/pax/night',sglR-twnR/2,'TWD']);
+    rows.push([`SRS per pax (${srsNt} 晚)`,srsPP,'TWD']);
+    rows.push(['SRS 人數',srsPax]);
+    rows.push(['SRS 總差額',srsTotal,'TWD']);
+    rows.push([]);
+  }
+
+  rows.push(['PRICING SUMMARY']);
+  rows.push(['Net Rate (P/P)',netPP,'TWD']);
+  rows.push(['Margin',margin/100,'%']);
+  rows.push(['Selling Price (P/P)',selling,'TWD']);
+  rows.push(['Profit (P/P)',profitPP,'TWD']);
+  rows.push(['Sell Rate',sellFx,'TWD/USD']);
+  rows.push(['Selling (P/P) USD',selUSD,'USD']);
+  rows.push(['Profit (Group)',profitPG,'TWD']);
+  rows.push(['Selling Total (Group)',selGrp,'TWD']);
+
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:30},{wch:14},...Array(n).fill({wch:11})];
+  XLSX.utils.book_append_sheet(wb,ws,'Cost Sheet');
+  XLSX.writeFile(wb,`CostSheet_${(sv('ref')||'tour').replace(/[^a-zA-Z0-9]/g,'_')}_${pax}pax.xlsx`);
+  toast('📥 Excel downloaded!');
+}
+
+// ─── CLEAR ────────────────────────────────────────────────────────────────────
+function clearAll() {
+  ['ref','pax','margin','fxrate','sellrate','srs-pax','srs-twin','srs-single','srs-nights']
+    .forEach(id=>$(id).value='');
+  delete $('srs-nights').dataset.touched;
+  // clear all cell inputs
+  document.querySelectorAll('.ci').forEach(el=>el.value='');
+  calcTotals();
+}
+
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+// ─── WIRE EVENTS ─────────────────────────────────────────────────────────────
+$('start-date').addEventListener('change', onDateChange);
+$('end-date').addEventListener('change',   onDateChange);
+['pax','margin','fxrate','sellrate','ref'].forEach(id=>$(id).addEventListener('input',calcTotals));
+['srs-pax','srs-twin','srs-single'].forEach(id=>$(id).addEventListener('input',calcSRS));
+$('srs-nights').addEventListener('input',function(){this.dataset.touched='1';calcSRS();});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+onDateChange();
+</script>
+</body>
+</html>
