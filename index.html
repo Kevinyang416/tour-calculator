@@ -127,19 +127,7 @@ tr.foc td.lc { color: var(--grn); }
   border: 1px dashed #86efac; text-align: right;
 }
 
-/* SRS */
-.srs-in {
-  padding: 11px 18px; background: var(--purplt);
-  border-bottom: 1px solid #ddd6fe;
-  display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
-}
-.srs-in .pg input { border-color: #c4b5fd; }
-.srs-res { display: flex; flex-wrap: wrap; background: #f5f3ff; border-bottom: 1px solid #ddd6fe; }
-.sc { padding: 10px 14px; border-right: 1px solid #ddd6fe; min-width: 140px; flex: 1; }
-.sc .sl { font-size: .57rem; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
-.sc .sv { font-size: .95rem; font-weight: 700; color: var(--purple); }
-.sc .sv.big { font-size: 1.2rem; color: #5b21b6; }
-.srs-fml { font-size: .61rem; color: #6d28d9; padding: 5px 18px 7px; background: #f5f3ff; border-bottom: 1px solid #ddd6fe; font-style: italic; }
+
 
 /* pricing */
 .pgrid { display: flex; flex-wrap: wrap; border-top: 3px solid var(--navy); }
@@ -237,13 +225,7 @@ table.cmp tr.sub-cmp td { background: #ccfbf1 !important; font-weight: 700; }
 <div class="sh" style="margin-top:1px">B &nbsp;INDIVIDUAL ITEMS — Per Pax <small>每人費用</small></div>
 <div class="twrap"><table id="tbl-ind"></table></div>
 
-<div class="sh pur" style="margin-top:1px">🛏 SINGLE ROOM SUPPLEMENT (SRS) <small>(住宿 TOTAL ÷ 2) × 晚數 ÷ 賣出匯率 = SRS per pax (USD)</small></div>
-<div class="srs-in">
-  <div class="pg"><label>SRS 人數</label><input type="text" inputmode="numeric" id="srs-pax" placeholder="0" oninput="calcSRS()"><small>需要單房的旅客數</small></div>
-  <div class="pg"><label>晚數 Nights</label><input type="text" inputmode="numeric" id="srs-nights" placeholder="0" oninput="this.dataset.touched='1';calcSRS()"><small>自動帶入，可手動覆蓋</small></div>
-</div>
-<div class="srs-res" id="srs-res"></div>
-<div class="srs-fml" id="srs-fml"></div>
+
 
 <div class="sh" style="margin-top:1px">💰 PRICING SUMMARY (A) + (B)</div>
 <div class="pgrid" id="pgrid"></div>
@@ -418,11 +400,26 @@ function buildTables(days) {
           id="i_${key}_${d}" placeholder="0"
           oninput="calcTotals()"></td>`;
       }
-      indHTML += `<tr class="${idx%2===0?'ev':''}">
-        <td class="lc">${label}</td>
-        <td class="rc" id="ir_${key}">–</td>
-        ${dayCells}
-      </tr>`;
+      if (key === 'hotel') {
+        indHTML += `<tr class="${idx%2===0?'ev':''}">
+          <td class="lc">${label}</td>
+          <td class="rc" id="ir_${key}">–</td>
+          ${dayCells}
+        </tr>
+        <tr>
+          <td class="lc" style="color:#7c3aed;font-size:.7rem;padding-left:20px;">
+            ↳ SRS (住宿 TOTAL ÷ 賣出匯率)
+          </td>
+          <td class="rc" id="srs-display" style="color:#7c3aed;font-size:.8rem;background:#f5f3ff;">–</td>
+          ${Array.from({length:n}, ()=>`<td style="background:#faf5ff;color:#aaa;text-align:center;font-size:.62rem">–</td>`).join('')}
+        </tr>`;
+      } else {
+        indHTML += `<tr class="${idx%2===0?'ev':''}">
+          <td class="lc">${label}</td>
+          <td class="rc" id="ir_${key}">–</td>
+          ${dayCells}
+        </tr>`;
+      }
     }
   });
   let tBCells = '';
@@ -542,6 +539,15 @@ function calcTotals() {
     }
     const el = $(`ir_${key}`);
     if(el) el.textContent = rowTot ? fmt(rowTot) : '–';
+    // update SRS display when hotel row is processed
+    if (key === 'hotel') {
+      const srsEl = $('srs-display');
+      if (srsEl) {
+        const sfx = parseFloat($('sellrate')?.value) || 0;
+        const srsUSD = (sfx && rowTot) ? rowTot / sfx : 0;
+        srsEl.textContent = srsUSD ? 'USD ' + fmtD(srsUSD) : '–';
+      }
+    }
   });
 
   // entrance multi-rows
@@ -588,9 +594,6 @@ function calcTotals() {
     const el=$(`gd_tA_${d}`); if(el) el.textContent='–';
   }
 
-  // ── SRS ──
-  calcSRS();
-
   // ── Pricing ──
   // Net = Total(A) per pax + Total(B) per pax
   // A already includes FOC÷pax, B is individual per pax
@@ -625,50 +628,7 @@ function calcTotals() {
   renderCmp();
 }
 
-// ─── SRS ──────────────────────────────────────────────────────────────────────
-// 公式: (住宿 Hotel TOTAL ÷ 2) × 晚數 ÷ 賣出匯率 = SRS per pax (USD)
-function calcSRS() {
-  const srsPax  = parseFloat($('srs-pax')?.value)   || 0;
-  const nights  = parseFloat($('srs-nights')?.value) || 0;
-  const sellFx  = parseFloat($('sellrate')?.value)   || 0;
 
-  // hotel total = sum of all i_hotel_d inputs across all days
-  let hotelTotal = 0;
-  for (let d = 0; d < lastN; d++) {
-    hotelTotal += parseFloat($(`i_hotel_${d}`)?.value) || 0;
-  }
-
-  const res = $('srs-res'), frm = $('srs-fml');
-
-  if (!srsPax || !nights) {
-    res.innerHTML = `<div class="sc" style="flex:1">
-      <div class="sl">STATUS</div>
-      <div class="sv" style="color:var(--muted)">請輸入 SRS 人數及晚數</div>
-    </div>`;
-    frm.textContent = '公式：(住宿 TOTAL ÷ 2) × 晚數 ÷ 賣出匯率 = SRS per pax (USD)';
-    return;
-  }
-
-  // (Hotel TOTAL ÷ 2) × nights ÷ sellFx
-  const halfHotel  = hotelTotal / 2;                          // TWD ÷ 2
-  const srsTWD     = halfHotel * nights;                      // × 晚數
-  const srsUSD     = sellFx ? srsTWD / sellFx : 0;           // ÷ 賣出匯率
-  const srsTotalUSD= srsUSD * srsPax;                         // × SRS人數
-
-  const cells = [
-    { l:'住宿 Hotel TOTAL (TWD)',       v: fmt(hotelTotal)+' TWD' },
-    { l:'住宿 ÷ 2',                    v: fmt(halfHotel)+' TWD'  },
-    { l:`× ${nights} 晚`,              v: fmt(srsTWD)+' TWD'     },
-    { l:`÷ 賣出匯率 ${sellFx||'–'}`,   v: `<span class="big">${fmtD(srsUSD)}</span> USD / pax` },
-    { l:`SRS 人數`,                     v: srsPax+' pax'          },
-    { l:'SRS 總額',                     v: `<span class="big">USD ${fmtD(srsTotalUSD)}</span>` },
-  ];
-  res.innerHTML = cells.map(c =>
-    `<div class="sc"><div class="sl">${c.l}</div><div class="sv">${c.v}</div></div>`
-  ).join('');
-  frm.textContent =
-    `公式：(住宿 ${fmt(hotelTotal)} ÷ 2 = ${fmt(halfHotel)}) × ${nights} 晚 = ${fmt(srsTWD)} TWD ÷ ${sellFx} = USD ${fmtD(srsUSD)} per pax`;
-}
 
 // ─── DATE CHANGE → REBUILD TABLES ────────────────────────────────────────────
 function onDateChange() {
@@ -677,9 +637,6 @@ function onDateChange() {
   if(!n) return;
   const nights = n-1;
   $('days-badge').textContent = `${n} Days / ${nights} Night${nights!==1?'s':''}`;
-
-  // Auto-set SRS nights if not manually touched
-  if(!$('srs-nights').dataset.touched) $('srs-nights').value = nights || '';
 
   buildTables(days);
   calcTotals();
@@ -693,67 +650,7 @@ function doExport() {
   const {n,pax,margin,sellFx,sharedTot,totalB,netPP,selling,profitPP,selGrp,profitPG,selUSD,grpUSD} = s;
   const days = getDays();
   const dH = days.map((_,i)=>`Day ${i+1}`);
-  const srsPax = parseFloat($('srs-pax')?.value)||0;
 
-  const rows=[];
-  rows.push([sv('ref')||'Tour Cost Sheet']);
-  rows.push([`Pax: ${pax}`,`Margin: ${margin}%`,`Sell Rate: ${sellFx}`,`Days: ${n}`]);
-  rows.push([]);
-
-  rows.push(['GROUP SHARING (A)','TOTAL TWD',...dH]);
-  GRP_ITEMS.forEach(({key,label,isFOC,isVan})=>{
-    if(isFOC){
-      rows.push(['FOC (= Total B per pax)',totalB,...Array(n).fill('= B')]);
-    } else {
-      const lbl = isVan ? (($('van-label')?.value)||'車輛 Vehicle') : label;
-      const vals=Array.from({length:n},(_,d)=>num($(`g_${key}_${d}`)?.value));
-      rows.push([lbl,vals.reduce((s,v)=>s+v,0),...vals]);
-    }
-  });
-  const gDay=Array(n).fill(0);
-  GRP_ITEMS.filter(g=>!g.isFOC).forEach(({key})=>{
-    Array.from({length:n},(_,d)=>num($(`g_${key}_${d}`)?.value)).forEach((v,d)=>gDay[d]+=v);
-  });
-  rows.push(['共同費用 Sub-total',sharedTot,...gDay]);
-  rows.push(['人數 (Pax)',pax]);
-  rows.push(['Total (A) per pax',s.totalA]);
-  rows.push([]);
-
-  rows.push(['INDIVIDUAL (B) per pax','TOTAL PP',...dH]);
-  IND_ITEMS.forEach(({key,label})=>{
-    if (key === 'entrance') {
-      // export each entrance row separately
-      window.entranceRows.forEach(row => {
-        const name = ($(`ent_name_${row.id}`)?.value) || row.name || '門票';
-        const vals = Array.from({length:n},(_,d)=>{
-          const el=$(`ent_${row.id}_${d}`);
-          return el ? (parseFloat(el.value)||0) : (parseFloat(row.vals?.[d])||0);
-        });
-        rows.push([name, vals.reduce((s,v)=>s+v,0), ...vals]);
-      });
-    } else {
-      const vals=Array.from({length:n},(_,d)=>num($(`i_${key}_${d}`)?.value));
-      rows.push([label,vals.reduce((s,v)=>s+v,0),...vals]);
-    }
-  });
-  rows.push(['Total (B) per pax',totalB]);
-  rows.push([]);
-
-  if(srsPax){
-    let hotelTot=0;
-    for(let d=0;d<n;d++) hotelTot+=parseFloat($(`i_hotel_${d}`)?.value)||0;
-    const srsNt   = parseFloat($('srs-nights')?.value)||0;
-    const srsUSD  = sellFx ? (hotelTot/2*srsNt/sellFx) : 0;
-    const srsTot  = srsUSD * srsPax;
-    rows.push(['SRS — 單房差']);
-    rows.push(['住宿 Hotel TOTAL', hotelTot, 'TWD']);
-    rows.push(['住宿 ÷ 2', hotelTot/2, 'TWD']);
-    rows.push([`× ${srsNt} 晚`, hotelTot/2*srsNt, 'TWD']);
-    rows.push([`÷ 賣出匯率 ${sellFx}`, srsUSD, 'USD / pax']);
-    rows.push(['SRS 人數', srsPax, 'pax']);
-    rows.push(['SRS 總額', srsTot, 'USD']);
-    rows.push([]);
-  }
 
   rows.push(['PRICING SUMMARY']);
   rows.push(['Net Rate (P/P)',netPP,'TWD']);
@@ -775,9 +672,9 @@ function doExport() {
 
 // ─── CLEAR ────────────────────────────────────────────────────────────────────
 function clearAll() {
-  ['ref','pax','margin','fxrate','sellrate','srs-pax','srs-nights']
+  ['ref','pax','margin','fxrate','sellrate']
     .forEach(id=>{ const el=$(id); if(el) el.value=''; });
-  delete $('srs-nights').dataset.touched;
+
   document.querySelectorAll('.ci').forEach(el=>el.value='');
   const vl=$('van-label'); if(vl) vl.value='九座 Van';
   window.entranceRows = [{ id: Date.now(), vals:{}, name:'' }];
@@ -794,8 +691,6 @@ function toast(msg){
 $('start-date').addEventListener('change', onDateChange);
 $('end-date').addEventListener('change',   onDateChange);
 ['pax','margin','fxrate','sellrate','ref'].forEach(id=>$(id).addEventListener('input',calcTotals));
-$('srs-pax').addEventListener('input', calcSRS);
-$('srs-nights').addEventListener('input', function(){ this.dataset.touched='1'; calcSRS(); });
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 onDateChange();
