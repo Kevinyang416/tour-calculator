@@ -208,7 +208,7 @@ table.cmp tr.sub-cmp td { background: #ccfbf1 !important; font-weight: 700; }
 <div class="pbar">
   <div class="pg"><label>Ref / 行程名</label><input class="wide" type="text" id="ref" placeholder="e.g. Rakso #1070246"></div>
   <div class="pg"><label>人數 Pax</label><input type="text" inputmode="numeric" id="pax" placeholder="0"><small>Min pax to confirm</small></div>
-  <div class="pg"><label>Margin %</label><input type="text" inputmode="numeric" id="margin" placeholder="0"><small>10 = 110%</small></div>
+  <div class="pg"><label>Margin (乘數)</label><input type="text" inputmode="numeric" id="margin" placeholder="1.1"><small>e.g. 1.1 = 110%</small></div>
   <div class="pg"><label>現在匯率 TWD/USD</label><input type="text" inputmode="numeric" id="fxrate" placeholder="0"></div>
   <div class="pg"><label>賣出匯率 Sell Rate</label><input type="text" inputmode="numeric" id="sellrate" placeholder="0"></div>
 </div>
@@ -275,7 +275,7 @@ const IND_ITEMS = [
   { key:'bkfast',    label:'早餐 Breakfast'      },
   { key:'lunch',     label:'午餐 Lunch'          },
   { key:'dinner',    label:'晚餐 Dinner'         },
-  { key:'entrance',  label:'門票 Entrance Fees'  },
+  { key:'entrance',  label:'其他費用 (如門票、車票)' },
   { key:'insurance', label:'保險 Insurance'      },
 ];
 
@@ -364,6 +364,9 @@ function buildTables(days) {
     }
   });
 
+  // ── Group extra rows (free-edit, like entrance) ──
+  grpHTML += `<tbody id="grp-extra-tbody"></tbody>`;
+
   // Sub-total, Pax, Total A rows
   let subCells='', paxCells='', tACells='';
   for(let d=0;d<n;d++){
@@ -387,6 +390,10 @@ function buildTables(days) {
 
   $('tbl-grp').innerHTML = grpHTML;
 
+  // Build group extra rows
+  if (!window.grpExtraRows) window.grpExtraRows = [{ id: Date.now() }];
+  renderGrpExtraRows(n);
+
   // ── Individual table ──
   let indHTML = hdr;
   IND_ITEMS.forEach(({key, label}, idx) => {
@@ -408,7 +415,7 @@ function buildTables(days) {
         </tr>
         <tr>
           <td class="lc" style="color:#7c3aed;font-size:.7rem;padding-left:20px;">
-            ↳ SRS (住宿 TOTAL ÷ 賣出匯率)
+            ↳ SRS (住宿 TOTAL ÷ 賣出匯率 × Margin)
           </td>
           <td class="rc" id="srs-display" style="color:#7c3aed;font-size:.8rem;background:#f5f3ff;">–</td>
           ${Array.from({length:n}, ()=>`<td style="background:#faf5ff;color:#aaa;text-align:center;font-size:.62rem">–</td>`).join('')}
@@ -438,6 +445,86 @@ function buildTables(days) {
   renderEntranceRows(n);
 }
 
+// ─── GROUP EXTRA ROWS (free-edit extra group costs) ──────────────────────────────
+window.grpExtraRows = [{ id: Date.now() }];
+
+function renderGrpExtraRows(n) {
+  n = n || lastN;
+  const tbody = $('grp-extra-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  window.grpExtraRows.forEach((row, ri) => {
+    const isFirst = ri === 0;
+    const tr = document.createElement('tr');
+    tr.className = ri % 2 === 0 ? 'ev' : '';
+    let dayCells = '';
+    for (let d = 0; d < n; d++) {
+      dayCells += `<td><input class="ci" type="text" inputmode="numeric"
+        id="gex_${row.id}_${d}" placeholder="0"
+        value="${row.vals && row.vals[d] !== undefined ? row.vals[d] : ''}"
+        oninput="onGrpExCell(this,${row.id},${d})"></td>`;
+    }
+    tr.innerHTML = `
+      <td class="lc" style="padding-left:11px;">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input type="text" id="gex_name_${row.id}"
+            value="${row.name||''}"
+            placeholder="其他費用名稱"
+            style="border:1px dashed #cbd5e1;border-radius:4px;padding:2px 6px;
+                   font-family:Verdana,sans-serif;font-size:.72rem;font-weight:600;
+                   width:110px;background:#fffef0;"
+            oninput="grpExtraRows[${ri}].name=this.value">
+          <button onclick="addGrpExtraRow()" title="新增項目"
+            style="background:#1e4d8c;color:#fff;border:none;border-radius:3px;
+                   width:20px;height:20px;cursor:pointer;font-size:.8rem;line-height:1;">+</button>
+          ${!isFirst ? `<button onclick="removeGrpExtraRow(${row.id})" title="移除此行"
+            style="background:#dc2626;color:#fff;border:none;border-radius:3px;
+                   width:20px;height:20px;cursor:pointer;font-size:.8rem;line-height:1;">−</button>` : ''}
+        </div>
+      </td>
+      <td class="rc" id="gex_tot_${row.id}">–</td>
+      ${dayCells}`;
+    tbody.appendChild(tr);
+  });
+  calcTotals();
+}
+
+function onGrpExCell(el, rowId, day) {
+  const row = window.grpExtraRows.find(r => r.id === rowId);
+  if (!row) return;
+  if (!row.vals) row.vals = {};
+  row.vals[day] = el.value;
+  calcTotals();
+}
+
+function addGrpExtraRow() {
+  window.grpExtraRows.push({ id: Date.now(), vals: {}, name: '' });
+  renderGrpExtraRows();
+}
+
+function removeGrpExtraRow(id) {
+  window.grpExtraRows = window.grpExtraRows.filter(r => r.id !== id);
+  renderGrpExtraRows();
+}
+
+function getGrpExtraTotals(n) {
+  const dayTots = Array(n).fill(0);
+  let grandTot = 0;
+  window.grpExtraRows.forEach(row => {
+    let rowTot = 0;
+    for (let d = 0; d < n; d++) {
+      const el = $(`gex_${row.id}_${d}`);
+      const v = el ? (parseFloat(el.value)||0) : (row.vals && parseFloat(row.vals[d])||0);
+      dayTots[d] += v;
+      rowTot += v;
+      grandTot += v;
+    }
+    const totEl = $(`gex_tot_${row.id}`);
+    if (totEl) totEl.textContent = rowTot ? fmt(rowTot) : '–';
+  });
+  return { dayTots, grandTot };
+}
+
 // ─── ENTRANCE MULTI-ROW ───────────────────────────────────────────────────────
 window.entranceRows = [{ id: 1 }];
 
@@ -463,7 +550,7 @@ function renderEntranceRows(n) {
         <div style="display:flex;align-items:center;gap:4px;">
           <input type="text" id="ent_name_${row.id}"
             value="${row.name||''}"
-            placeholder="門票名稱"
+            placeholder="費用名稱"
             style="border:1px dashed #cbd5e1;border-radius:4px;padding:2px 6px;
                    font-family:Verdana,sans-serif;font-size:.72rem;font-weight:600;
                    width:100px;background:#fffef0;"
@@ -544,7 +631,8 @@ function calcTotals() {
       const srsEl = $('srs-display');
       if (srsEl) {
         const sfx = parseFloat($('sellrate')?.value) || 0;
-        const srsUSD = (sfx && rowTot) ? rowTot / sfx : 0;
+        const marginMult = parseFloat($('margin')?.value) || 1;
+        const srsUSD = (sfx && rowTot) ? (rowTot / sfx) * marginMult : 0;
         srsEl.textContent = srsUSD ? 'USD ' + fmtD(srsUSD) : '–';
       }
     }
@@ -575,6 +663,9 @@ function calcTotals() {
     const el = $(`gr_${key}`);
     if(el) el.textContent = rowTot ? fmt(rowTot) : '–';
   });
+  // include free-edit extra group rows
+  const { dayTots: gexDay, grandTot: gexTot } = getGrpExtraTotals(n);
+  gexDay.forEach((v,d) => gDay[d] += v);
   const nonFocTot = gDay.reduce((s,v)=>s+v,0);
 
   // Sub-total = non-FOC group costs + FOC (= totalB)
@@ -598,7 +689,7 @@ function calcTotals() {
   // Net = Total(A) per pax + Total(B) per pax
   // A already includes FOC÷pax, B is individual per pax
   const netPP2    = totalA + totalB;
-  const selling   = netPP2*(1+margin/100);
+  const selling   = netPP2*margin;
   const profitPP  = selling - netPP2;
   const selGrp    = selling*pax;
   const profitPG  = profitPP*pax;
@@ -607,7 +698,7 @@ function calcTotals() {
 
   const pcells = [
     { l:'Net Rate (P/P)',        v: fmt(netPP2),              c:'big'  },
-    { l:'Margin',                v: margin ? margin+'%':'–',  c:''     },
+    { l:'Margin (乘數)',         v: margin ? margin+'×':'–',  c:''     },
     { l:'Selling Price (P/P)',   v: selling ? fmt(selling):'–', c:'big' },
     { l:'Profit (P/P) TWD',     v: fmt(profitPP),            c:'gold' },
     { l:'Sell Rate TWD/USD',    v: sellFx ? sellFx.toFixed(1):'–', c:'' },
@@ -650,17 +741,81 @@ function doExport() {
   const {n,pax,margin,sellFx,sharedTot,totalB,netPP,selling,profitPP,selGrp,profitPG,selUSD,grpUSD} = s;
   const days = getDays();
   const dH = days.map((_,i)=>`Day ${i+1}`);
+  const rows = [];
 
+  // ── Header ──
+  rows.push([sv('ref') || 'Tour Cost Sheet']);
+  rows.push([`Pax: ${pax}`, `Margin: ${margin}×`, `Sell Rate: ${sellFx}`, `Days: ${n}`]);
+  rows.push([]);
 
+  // ── Group Sharing (A) ──
+  rows.push(['GROUP SHARING ITEMS (A)', 'TOTAL TWD', ...dH]);
+  GRP_ITEMS.forEach(({key, label, isFOC, isVan}) => {
+    if (isFOC) {
+      rows.push(['FOC (= Total B per pax)', totalB, ...Array(n).fill('= B')]);
+    } else {
+      const lbl = isVan ? (($('van-label')?.value) || '車輛') : label;
+      const vals = Array.from({length:n}, (_, d) => parseFloat($(`g_${key}_${d}`)?.value) || 0);
+      rows.push([lbl, vals.reduce((a,v)=>a+v,0), ...vals]);
+    }
+  });
+  // extra group rows
+  window.grpExtraRows.forEach(row => {
+    const name = ($(`gex_name_${row.id}`)?.value) || row.name || '其他費用';
+    const vals = Array.from({length:n},(_,d) => {
+      const el = $(`gex_${row.id}_${d}`);
+      return el ? (parseFloat(el.value)||0) : (parseFloat(row.vals?.[d])||0);
+    });
+    rows.push([name, vals.reduce((a,v)=>a+v,0), ...vals]);
+  });
+  const gDay = Array(n).fill(0);
+  GRP_ITEMS.filter(g=>!g.isFOC).forEach(({key}) => {
+    Array.from({length:n},(_,d) => parseFloat($(`g_${key}_${d}`)?.value)||0).forEach((v,d) => gDay[d]+=v);
+  });
+  window.grpExtraRows.forEach(row => {
+    Array.from({length:n},(_,d) => {
+      const el=$(`gex_${row.id}_${d}`); return el?(parseFloat(el.value)||0):(parseFloat(row.vals?.[d])||0);
+    }).forEach((v,d) => gDay[d]+=v);
+  });
+  rows.push(['共同費用 Sub-total (含FOC)', sharedTot, ...gDay]);
+  rows.push(['人數 (Pax)', pax]);
+  rows.push(['Total (A) per pax', s.totalA]);
+  rows.push([]);
+
+  // ── Individual (B) ──
+  rows.push(['INDIVIDUAL ITEMS (B) per pax', 'TOTAL PP', ...dH]);
+  // hotel + SRS
+  const hotelVals = Array.from({length:n},(_,d) => parseFloat($(`i_hotel_${d}`)?.value)||0);
+  const hotelTot  = hotelVals.reduce((a,v)=>a+v,0);
+  const srsUSD    = (sellFx && hotelTot) ? (hotelTot / sellFx) * margin : 0;
+  rows.push(['住宿 Hotel', hotelTot, ...hotelVals]);
+  rows.push([`↳ SRS (住宿 ÷ 賣出匯率 × Margin)`, srsUSD ? `USD ${srsUSD.toFixed(2)}` : '–']);
+
+  IND_ITEMS.filter(i => i.key !== 'hotel' && i.key !== 'entrance').forEach(({key, label}) => {
+    const vals = Array.from({length:n},(_,d) => parseFloat($(`i_${key}_${d}`)?.value)||0);
+    rows.push([label, vals.reduce((a,v)=>a+v,0), ...vals]);
+  });
+
+  // entrance rows
+  window.entranceRows.forEach(row => {
+    const name = $(`ent_name_${row.id}`)?.value || row.name || '門票';
+    const vals  = Array.from({length:n},(_,d) => parseFloat($(`ent_${row.id}_${d}`)?.value) || parseFloat(row.vals?.[d]) || 0);
+    rows.push([name, vals.reduce((a,v)=>a+v,0), ...vals]);
+  });
+
+  rows.push(['Total (B) per pax', totalB]);
+  rows.push([]);
+
+  // ── Pricing ──
   rows.push(['PRICING SUMMARY']);
-  rows.push(['Net Rate (P/P)',netPP,'TWD']);
-  rows.push(['Margin',margin/100,'%']);
-  rows.push(['Selling Price (P/P)',selling,'TWD']);
-  rows.push(['Profit (P/P)',profitPP,'TWD']);
-  rows.push(['Sell Rate',sellFx,'TWD/USD']);
-  rows.push(['Selling (P/P) USD',selUSD,'USD']);
-  rows.push(['Profit (Group)',profitPG,'TWD']);
-  rows.push(['Selling Total (Group)',selGrp,'TWD']);
+  rows.push(['Net Rate (P/P)',        netPP,       'TWD']);
+  rows.push(['Margin (乘數)',         margin,       '×']);
+  rows.push(['Selling Price (P/P)',  selling,      'TWD']);
+  rows.push(['Profit (P/P)',         profitPP,     'TWD']);
+  rows.push(['Sell Rate',            sellFx,       'TWD/USD']);
+  rows.push(['Selling (P/P) USD',    selUSD,       'USD']);
+  rows.push(['Profit (Group)',        profitPG,    'TWD']);
+  rows.push(['Selling Total (Group)',selGrp,       'TWD']);
 
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet(rows);
@@ -677,6 +832,8 @@ function clearAll() {
 
   document.querySelectorAll('.ci').forEach(el=>el.value='');
   const vl=$('van-label'); if(vl) vl.value='九座 Van';
+  window.grpExtraRows = [{ id: Date.now(), vals:{}, name:'' }];
+  renderGrpExtraRows();
   window.entranceRows = [{ id: Date.now(), vals:{}, name:'' }];
   renderEntranceRows();
   calcTotals();
@@ -732,7 +889,7 @@ function renderCmp() {
   }
 
   const { sharedTot, totalB, margin, sellFx } = snap;
-  const marginMult = 1 + (margin / 100);
+  const marginMult = margin;
 
   let html = `<thead><tr>
     <th class="lc">方案</th>
