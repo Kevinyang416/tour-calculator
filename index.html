@@ -196,18 +196,84 @@ table.cmp tr.sub-cmp td { background: #ccfbf1 !important; font-weight: 700; }
 }
 .del-btn:hover { background: #fca5a5; }
 
+
+/* ── TABS ── */
+.tab-bar {
+  background: #0a1829;
+  display: flex; align-items: flex-end;
+  padding: 0 16px;
+  gap: 3px;
+  border-bottom: 3px solid var(--blue);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+.tab-bar::-webkit-scrollbar { height: 4px; }
+.tab-bar::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 2px; }
+
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px 6px;
+  background: #162f54;
+  color: rgba(255,255,255,.55);
+  font-size: .72rem; font-weight: 600;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,.08);
+  border-bottom: none;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+  position: relative;
+  min-width: 90px;
+}
+.tab:hover { background: #1e4d8c; color: rgba(255,255,255,.8); }
+.tab.active {
+  background: var(--white);
+  color: var(--navy);
+  border-color: var(--mid);
+  font-weight: 700;
+}
+.tab .tab-close {
+  font-size: .7rem; color: inherit; opacity: .5;
+  background: none; border: none; cursor: pointer;
+  padding: 0 2px; line-height: 1;
+  margin-left: 2px;
+}
+.tab .tab-close:hover { opacity: 1; color: #dc2626; }
+.tab-add {
+  padding: 6px 12px 5px;
+  background: transparent;
+  color: rgba(255,255,255,.5);
+  font-size: .9rem;
+  border: 1.5px dashed rgba(255,255,255,.2);
+  border-radius: 5px 5px 0 0;
+  cursor: pointer;
+  align-self: flex-end;
+  margin-bottom: 0;
+  transition: all .15s;
+}
+.tab-add:hover { background: rgba(255,255,255,.08); color: #fff; border-color: rgba(255,255,255,.4); }
 </style>
 </head>
 <body>
-<div class="wrap"><div class="card">
+<div class="wrap">
 
-<div class="hdr">
+<!-- GLOBAL HEADER (outside tabs) -->
+<div style="background:var(--navy);border-radius:var(--radius) var(--radius) 0 0;
+            padding:14px 22px 10px;display:flex;align-items:center;justify-content:space-between;">
   <div>
-    <h1>Edison Tours 宏祥旅行社</h1>
-    <p>Tour Cost Calculator — Day-by-Day Costing</p>
+    <div style="font-size:1.1rem;font-weight:700;color:#fff;">Edison Tours 宏祥旅行社</div>
+    <div style="font-size:.64rem;color:rgba(255,255,255,.45);margin-top:2px;">Tour Cost Calculator — Day-by-Day Costing</div>
   </div>
   <span class="badge" id="ref-badge">New Quote</span>
 </div>
+
+<!-- TAB BAR -->
+<div class="tab-bar" id="tab-bar">
+  <!-- tabs injected by JS -->
+</div>
+
+<!-- TAB CONTENT -->
+<div class="card" id="tab-content" style="border-radius:0 0 var(--radius) var(--radius);">
 
 
 <div class="sh">⚙ BASIC PARAMETERS</div>
@@ -238,7 +304,8 @@ table.cmp tr.sub-cmp td { background: #ccfbf1 !important; font-weight: 700; }
 
 <div class="acts">
   <button class="btn btn-p" onclick="calcTotals()">🔄 Recalculate</button>
-  <button class="btn btn-g" onclick="doExport()">📥 Export Excel</button>
+  <button class="btn btn-g" onclick="doExport()">📥 Export 此分頁</button>
+  <button class="btn" style="background:#0f766e;color:#fff;" onclick="doExportAll()">📦 Export 全部分頁</button>
   <button class="btn btn-o" onclick="clearAll()">🗑 Clear All</button>
 </div>
 
@@ -262,7 +329,8 @@ table.cmp tr.sub-cmp td { background: #ccfbf1 !important; font-weight: 700; }
 </div>
 <div class="cmp-wrap"><table class="cmp" id="cmp-table"></table></div>
 
-</div></div>
+</div><!-- /tab-content -->
+</div><!-- /wrap -->
 <div id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -768,9 +836,11 @@ function onDateChange() {
 }
 
 // ─── EXPORT ───────────────────────────────────────────────────────────────────
-function doExport() {
-  calcTotals();
-  const s = window._snap; if(!s) return;
+// ── Core sheet builder (called per tab) ──────────────────────────────────────
+function buildSheet(s, tabName) {
+  const {n,pax,margin,sellFx,sharedTot,totalB,netPP,selling,profitPP,selGrp,profitPG,selUSD,grpUSD,focQty} = s;
+  const days = getDays();
+  const TW2 = ['日','一','二','三','四','五','六'];
   const {n,pax,margin,sellFx,sharedTot,totalB,netPP,selling,profitPP,selGrp,profitPG,selUSD,grpUSD,focQty} = s;
   const days = getDays();
   const TW2 = ['日','一','二','三','四','五','六'];
@@ -784,7 +854,6 @@ function doExport() {
     purple: '7C3AED', purplt:'EDE9FE',
   };
 
-  const wb = XLSX.utils.book_new();
   const ws = {};
   const merges = [];
 
@@ -1039,15 +1108,66 @@ function doExport() {
   }
   R++;
 
-  // set range
-  ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0},e:{r:R,c:totalCols-1}});
+
+  return { ws, merges, totalCols, n };
+}
+
+// ── Export current tab only ───────────────────────────────────────────────────
+function doExport() {
+  calcTotals();
+  const s = window._snap; if(!s) return;
+  const wb = XLSX.utils.book_new();
+  const tabName = (tabs.find(t=>t.id===activeTabId)?.name || 'Sheet').replace(/[^a-zA-Z0-9\u4e00-\u9fff _-]/g,'').substring(0,30) || 'Cost Sheet';
+  const {ws, merges, totalCols, n} = buildSheet(s, tabName);
+  ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0},e:{r:999,c:totalCols-1}});
   ws['!merges'] = merges;
   ws['!cols'] = [{wch:32},{wch:14},...Array(n).fill({wch:12})];
-  ws['!rows'] = [{hpt:20},{hpt:16},null,{hpt:18},{hpt:28}];
-
-  XLSX.utils.book_append_sheet(wb,ws,'Cost Sheet');
-  XLSX.writeFile(wb,`CostSheet_${(sv('ref')||'tour').replace(/[^a-zA-Z0-9]/g,'_')}_${pax}pax.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, tabName);
+  XLSX.writeFile(wb, `CostSheet_${(sv('ref')||'tour').replace(/[^a-zA-Z0-9]/g,'_')}_${s.pax}pax.xlsx`);
   toast('📥 Excel downloaded!');
+}
+
+// ── Export ALL tabs (each tab = one sheet) ────────────────────────────────────
+function doExportAll() {
+  if (!tabs || tabs.length === 0) { toast('沒有分頁可匯出'); return; }
+
+  // Save current tab first
+  if (activeTabId !== null) {
+    const cur = tabs.find(t=>t.id===activeTabId);
+    if (cur) cur.data = collectTabData();
+  }
+
+  const wb = XLSX.utils.book_new();
+  const savedActiveId = activeTabId;
+
+  tabs.forEach((tab, idx) => {
+    // Restore each tab's data silently to read DOM values
+    if (tab.id !== savedActiveId) {
+      if (tab.data) restoreTabData(tab.data);
+      else clearAllSilent();
+    }
+
+    calcTotals();
+    const s = window._snap;
+    if (!s) return;
+
+    const sheetName = (tab.name || `版本${idx+1}`)
+      .replace(/[^a-zA-Z0-9\u4e00-\u9fff _-]/g,'')
+      .substring(0, 28) || `Sheet${idx+1}`;
+
+    const {ws, merges, totalCols, n} = buildSheet(s, sheetName);
+    ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0},e:{r:999,c:totalCols-1}});
+    ws['!merges'] = merges;
+    ws['!cols'] = [{wch:32},{wch:14},...Array(n).fill({wch:12})];
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  });
+
+  // Restore original active tab
+  activeTabId = null;
+  switchTab(savedActiveId);
+
+  XLSX.writeFile(wb, `CostSheet_AllVersions_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast(`📦 匯出完成！共 ${tabs.length} 個分頁`);
 }
 
 // ─── CLEAR ────────────────────────────────────────────────────────────────────
@@ -1072,9 +1192,11 @@ function toast(msg){
 // ─── WIRE EVENTS ─────────────────────────────────────────────────────────────
 $('start-date').addEventListener('change', onDateChange);
 $('end-date').addEventListener('change',   onDateChange);
-['pax','margin','fxrate','sellrate','ref'].forEach(id=>$(id).addEventListener('input',calcTotals));
+['pax','margin','fxrate','sellrate'].forEach(id=>$(id).addEventListener('input',calcTotals));
+$('ref').addEventListener('input', ()=>{ calcTotals(); updateTabName(); });
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
+initTabs();
 onDateChange();
 // ─── MULTI-PAX COMPARISON ─────────────────────────────────────────────────────
 // Logic (CORRECTED):
@@ -1182,6 +1304,243 @@ function renderCmp() {
   tbl.innerHTML = html;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TAB SYSTEM
+// Each tab stores a complete snapshot of all inputs + state
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let tabs = [];
+let activeTabId = null;
+let tabCounter = 0;
+
+// ── Collect all current input values into a data object ──
+function collectTabData() {
+  const data = {
+    // params
+    ref:       $('ref')?.value       || '',
+    pax:       $('pax')?.value       || '',
+    margin:    $('margin')?.value    || '',
+    fxrate:    $('fxrate')?.value    || '',
+    sellrate:  $('sellrate')?.value  || '',
+    startDate: $('start-date')?.value || '',
+    endDate:   $('end-date')?.value   || '',
+    // grp cells
+    grp: {},
+    // ind cells
+    ind: {},
+    // van label
+    vanLabel: $('van-label')?.value || '',
+    // grp extra rows
+    grpExtraRows: window.grpExtraRows.map(r=>({
+      id: r.id, name: $(`gex_name_${r.id}`)?.value || r.name || '',
+      vals: Object.fromEntries(
+        Array.from({length:lastN},(_,d)=>[ d, $(`gex_${r.id}_${d}`)?.value||'' ])
+      )
+    })),
+    // entrance rows
+    entranceRows: window.entranceRows.map(r=>({
+      id: r.id, name: $(`ent_name_${r.id}`)?.value || r.name || '',
+      vals: Object.fromEntries(
+        Array.from({length:lastN},(_,d)=>[ d, $(`ent_${r.id}_${d}`)?.value||'' ])
+      )
+    })),
+    focQty: window.focQty || 1,
+    lastN,
+  };
+  // collect grp inputs
+  GRP_ITEMS.filter(g=>!g.isFOC).forEach(({key})=>{
+    data.grp[key] = Array.from({length:lastN},(_,d)=>$(`g_${key}_${d}`)?.value||'');
+  });
+  // collect ind inputs
+  IND_ITEMS.filter(i=>i.key!=='entrance').forEach(({key})=>{
+    data.ind[key] = Array.from({length:lastN},(_,d)=>$(`i_${key}_${d}`)?.value||'');
+  });
+  return data;
+}
+
+// ── Restore inputs from a saved data object ──
+function restoreTabData(data) {
+  if (!data) return;
+  // params
+  if($('ref'))        $('ref').value        = data.ref       || '';
+  if($('pax'))        $('pax').value        = data.pax       || '';
+  if($('margin'))     $('margin').value     = data.margin    || '';
+  if($('fxrate'))     $('fxrate').value     = data.fxrate    || '';
+  if($('sellrate'))   $('sellrate').value   = data.sellrate  || '';
+  if($('start-date')) $('start-date').value = data.startDate || '2026-10-28';
+  if($('end-date'))   $('end-date').value   = data.endDate   || '2026-11-01';
+
+  // rebuild tables first (date may differ)
+  const days = getDays();
+  const n = days.length;
+  const nights = n-1;
+  $('days-badge').textContent = `${n} Days / ${nights} Night${nights!==1?'s':''}`;
+
+  // restore extra rows state
+  window.grpExtraRows = (data.grpExtraRows||[{id:Date.now(),vals:{},name:''}]).map(r=>({...r}));
+  window.entranceRows = (data.entranceRows||[{id:Date.now(),vals:{},name:''}]).map(r=>({...r}));
+  window.focQty = data.focQty ?? 1;
+
+  // rebuild tables
+  buildTables(days);
+
+  // restore grp inputs
+  GRP_ITEMS.filter(g=>!g.isFOC).forEach(({key})=>{
+    (data.grp[key]||[]).forEach((v,d)=>{ const el=$(`g_${key}_${d}`); if(el) el.value=v; });
+  });
+  const vl=$('van-label'); if(vl) vl.value = data.vanLabel||'九座 Van';
+
+  // restore ind inputs
+  IND_ITEMS.filter(i=>i.key!=='entrance').forEach(({key})=>{
+    (data.ind[key]||[]).forEach((v,d)=>{ const el=$(`i_${key}_${d}`); if(el) el.value=v; });
+  });
+
+  // restore grpExtra name inputs
+  (data.grpExtraRows||[]).forEach(row=>{
+    const el=$(`gex_name_${row.id}`); if(el) el.value=row.name||'';
+    Object.entries(row.vals||{}).forEach(([d,v])=>{
+      const cel=$(`gex_${row.id}_${d}`); if(cel) cel.value=v;
+    });
+  });
+
+  // restore entrance name inputs
+  (data.entranceRows||[]).forEach(row=>{
+    const el=$(`ent_name_${row.id}`); if(el) el.value=row.name||'';
+    Object.entries(row.vals||{}).forEach(([d,v])=>{
+      const cel=$(`ent_${row.id}_${d}`); if(cel) cel.value=v;
+    });
+  });
+
+  calcTotals();
+  renderCmp();
+}
+
+// ── Render tab bar ──
+function renderTabBar() {
+  const bar = $('tab-bar');
+  bar.innerHTML = '';
+  tabs.forEach(tab=>{
+    const el = document.createElement('div');
+    el.className = 'tab' + (tab.id===activeTabId?' active':'');
+    el.innerHTML = `
+      <span onclick="switchTab(${tab.id})" style="flex:1;">${tab.name}</span>
+      ${tabs.length>1?`<button class="tab-close" onclick="closeTab(${tab.id})" title="刪除此分頁">✕</button>`:''}
+    `;
+    bar.appendChild(el);
+  });
+  // add button
+  const addBtn = document.createElement('button');
+  addBtn.className = 'tab-add';
+  addBtn.textContent = '＋';
+  addBtn.title = '新增報價分頁';
+  addBtn.onclick = addTab;
+  bar.appendChild(addBtn);
+}
+
+// ── Add new tab ──
+function addTab() {
+  // save current tab first
+  if (activeTabId !== null) {
+    const cur = tabs.find(t=>t.id===activeTabId);
+    if (cur) cur.data = collectTabData();
+  }
+  tabCounter++;
+  const newId = tabCounter;
+  const newTab = {
+    id: newId,
+    name: `版本 ${tabCounter}`,
+    data: null, // blank
+  };
+  tabs.push(newTab);
+  switchTab(newId);
+}
+
+// ── Switch to tab ──
+function switchTab(id) {
+  // save current
+  if (activeTabId !== null && activeTabId !== id) {
+    const cur = tabs.find(t=>t.id===activeTabId);
+    if (cur) cur.data = collectTabData();
+  }
+  activeTabId = id;
+  const tab = tabs.find(t=>t.id===id);
+  renderTabBar();
+  if (tab && tab.data) {
+    restoreTabData(tab.data);
+  } else {
+    // blank new tab
+    clearAllSilent();
+    calcTotals();
+    renderCmp();
+  }
+}
+
+// ── Close tab ──
+function closeTab(id) {
+  if (tabs.length <= 1) return;
+  const idx = tabs.findIndex(t=>t.id===id);
+  tabs = tabs.filter(t=>t.id!==id);
+  if (activeTabId === id) {
+    const nextTab = tabs[Math.min(idx, tabs.length-1)];
+    activeTabId = null;
+    switchTab(nextTab.id);
+  } else {
+    renderTabBar();
+  }
+}
+
+// ── Rename tab on double-click ──
+function renameTab(id) {
+  const tab = tabs.find(t=>t.id===id);
+  if (!tab) return;
+  const name = prompt('分頁名稱：', tab.name);
+  if (name && name.trim()) {
+    tab.name = name.trim();
+    renderTabBar();
+  }
+}
+
+// ── clearAll without switching tab ──
+function clearAllSilent() {
+  ['ref','pax','margin','fxrate','sellrate'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  $('start-date').value = '2026-10-28';
+  $('end-date').value   = '2026-11-01';
+  window.grpExtraRows = [{id:Date.now(),vals:{},name:''}];
+  window.entranceRows = [{id:Date.now(),vals:{},name:''}];
+  window.focQty = 1;
+  const days = getDays();
+  buildTables(days);
+  document.querySelectorAll('.ci').forEach(el=>el.value='');
+  const vl=$('van-label'); if(vl) vl.value='九座 Van';
+  renderGrpExtraRows();
+  renderEntranceRows();
+}
+
+// ── Override clearAll to stay in current tab ──
+function clearAll() {
+  clearAllSilent();
+  calcTotals();
+  renderCmp();
+}
+
+// ── Override ref badge to update tab name ──
+function updateTabName() {
+  const ref = $('ref')?.value?.trim();
+  if (ref && activeTabId !== null) {
+    const tab = tabs.find(t=>t.id===activeTabId);
+    if (tab && tab.name.startsWith('版本')) tab.name = ref;
+    renderTabBar();
+  }
+}
+
+// ── INIT TABS ──
+function initTabs() {
+  tabCounter = 1;
+  tabs = [{ id:1, name:'版本 1', data:null }];
+  activeTabId = 1;
+  renderTabBar();
+}
 
 </script>
 </body>
