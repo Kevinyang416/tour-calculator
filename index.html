@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tour Cost Calculator</title>
+<title>Tour Cost Calculator v12 — 含歷史紀錄</title>
 <style>
 :root {
   --navy:   #0f2340;
@@ -252,6 +252,144 @@ table.cmp tr.sub-cmp td { background: #ccfbf1 !important; font-weight: 700; }
   transition: all .15s;
 }
 .tab-add:hover { background: rgba(255,255,255,.08); color: #fff; border-color: rgba(255,255,255,.4); }
+
+/* ─── HISTORY SIDEBAR & SAVE ──────────────────────────────────────────── */
+.btn-save { background:#16a34a; color:#fff; }
+.btn-save:hover { background:#15803d; opacity:1; }
+
+.hist-toggle {
+  position: fixed; right: 0; top: 38%;
+  background: var(--navy); color:#fff;
+  padding: 14px 8px; border:none;
+  border-radius: 8px 0 0 8px;
+  font-family: Verdana, sans-serif;
+  font-size: .72rem; font-weight: 700;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  cursor: pointer; box-shadow: -3px 0 10px rgba(0,0,0,.18);
+  z-index: 998; letter-spacing:.15em;
+}
+.hist-toggle:hover { background: var(--blue); }
+.hist-toggle .hist-count {
+  display:inline-block; margin-top:6px;
+  background: var(--gold); color: var(--navy);
+  font-size:.6rem; font-weight:700;
+  padding:1px 6px; border-radius:10px;
+  writing-mode: horizontal-tb;
+}
+
+.hist-backdrop {
+  position: fixed; inset:0; background: rgba(15,35,64,.25);
+  z-index: 997; opacity:0; pointer-events:none; transition: opacity .2s;
+}
+.hist-backdrop.show { opacity:1; pointer-events:auto; }
+
+.hist-sidebar {
+  position: fixed; right: -400px; top:0; bottom:0;
+  width: 380px; background:#fff;
+  box-shadow: -6px 0 28px rgba(15,35,64,.25);
+  z-index: 999; display:flex; flex-direction:column;
+  transition: right .25s ease;
+}
+.hist-sidebar.open { right:0; }
+.hist-hdr {
+  background: var(--navy); color:#fff;
+  padding: 12px 16px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.hist-hdr h2 { font-size:.92rem; font-weight:700; }
+.hist-hdr .sub { font-size:.6rem; opacity:.55; margin-top:1px; }
+.hist-close {
+  background:none; border:none; color:#fff;
+  font-size:1.3rem; cursor:pointer; opacity:.7; line-height:1;
+}
+.hist-close:hover { opacity:1; }
+
+.hist-search {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--mid);
+  background: var(--grey);
+}
+.hist-search input {
+  width:100%; padding:6px 10px;
+  border:1.5px solid var(--mid); border-radius:5px;
+  font-family: Verdana, sans-serif; font-size:.76rem;
+  background:#fff;
+}
+.hist-search input:focus { outline:none; border-color: var(--sky); }
+
+.hist-list { flex:1; overflow-y:auto; padding:10px; background:#f6f9fd; }
+.hist-empty {
+  text-align:center; color: var(--muted);
+  font-size:.74rem; padding:40px 14px; line-height:1.5;
+}
+
+.hist-item {
+  background:#fff; border:1px solid var(--mid); border-radius:8px;
+  padding:9px 11px; margin-bottom:9px;
+  transition: .15s;
+}
+.hist-item:hover {
+  border-color: var(--sky);
+  box-shadow: 0 3px 8px rgba(15,35,64,.10);
+  transform: translateY(-1px);
+}
+.hi-name {
+  font-size:.8rem; font-weight:700; color: var(--navy);
+  margin-bottom:3px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.hi-meta { font-size:.62rem; color: var(--muted); }
+.hi-figs {
+  display:flex; gap:5px; flex-wrap:wrap;
+  font-size:.65rem; margin:5px 0;
+}
+.hi-figs span {
+  background:#f1f5f9; padding:1px 6px; border-radius:3px; color:#475569;
+}
+.hi-figs span.net  { background:#dbeafe; color: var(--blue); font-weight:700; }
+.hi-figs span.sell { background:#fef3c7; color:#a16207; font-weight:700; }
+.hi-figs span.usd  { background:#dcfce7; color: var(--grn);  font-weight:700; }
+
+.hi-acts { display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
+.hi-btn {
+  background: var(--blue); color:#fff;
+  border:none; border-radius:4px;
+  font-family: Verdana, sans-serif; font-size:.64rem; font-weight:700;
+  padding:5px 7px; cursor:pointer; line-height:1;
+}
+.hi-btn.newtab { background:#0f766e; }
+.hi-btn.rename { background: var(--purple); }
+.hi-btn.export { background: var(--gold); color: var(--navy); }
+.hi-btn.del    { background:#dc2626; }
+.hi-btn:hover  { opacity:.85; }
+
+.hist-foot {
+  padding: 10px; border-top:1px solid var(--mid); background: var(--grey);
+  display:flex; gap:6px; flex-wrap:wrap;
+}
+.hist-foot button {
+  flex:1; min-width:0;
+  background:#fff; color: var(--navy);
+  border:1.5px solid var(--mid); border-radius:4px;
+  font-family: Verdana, sans-serif; font-size:.68rem; font-weight:700;
+  padding:6px 8px; cursor:pointer;
+}
+.hist-foot button:hover { background: var(--ice); border-color: var(--sky); }
+
+
+/* hotel meta inputs (City, Hotel Name) — per-day text */
+.mi {
+  width: 100%; padding: 3px 5px;
+  border: 1px dashed #cbd5e1; border-radius: 4px;
+  font-family: Verdana, sans-serif; font-size: .68rem;
+  text-align: left; background: #fffbeb;
+  color: #92400e; min-width: 60px;
+}
+.mi:focus { outline: none; border-color: var(--gold); background: #fff; }
+.mi::placeholder { color: #d4b27a; font-style: italic; }
+tr.hotelmeta td      { background: #fffbeb !important; padding: 2px 4px !important; }
+tr.hotelmeta td.lc   { color: #92400e; font-size: .65rem !important; padding-left: 20px !important; font-weight: 600; }
+tr.hotelmeta td.rc   { background: #fef3c7 !important; color: #92400e !important; font-size: .62rem !important; font-style: italic; }
 </style>
 </head>
 <body>
@@ -306,6 +444,9 @@ table.cmp tr.sub-cmp td { background: #ccfbf1 !important; font-weight: 700; }
   <button class="btn btn-p" onclick="calcTotals()">🔄 Recalculate</button>
   <button class="btn btn-g" onclick="doExport()">📥 Export 此分頁</button>
   <button class="btn" style="background:#0f766e;color:#fff;" onclick="doExportAll()">📦 Export 全部分頁</button>
+  <button class="btn btn-save" onclick="saveCurrentToHistory()">💾 存檔</button>
+  <button class="btn" style="background:#7c3aed;color:#fff;" onclick="saveAsLocal()">💼 另存新檔到本機</button>
+  <button class="btn btn-o" onclick="toggleHistorySidebar()">📚 歷史紀錄</button>
   <button class="btn btn-o" onclick="clearAll()">🗑 Clear All</button>
 </div>
 
@@ -331,6 +472,36 @@ table.cmp tr.sub-cmp td { background: #ccfbf1 !important; font-weight: 700; }
 
 </div><!-- /tab-content -->
 </div><!-- /wrap -->
+<!-- ─── HISTORY SIDEBAR ─── -->
+<button class="hist-toggle" onclick="toggleHistorySidebar()" title="開啟歷史紀錄">
+  📚 歷史紀錄
+  <span class="hist-count" id="hist-count">0</span>
+</button>
+<div class="hist-backdrop" id="hist-backdrop" onclick="closeHistorySidebar()"></div>
+<aside class="hist-sidebar" id="hist-sidebar" aria-hidden="true">
+  <div class="hist-hdr">
+    <div>
+      <h2>📚 歷史報價紀錄</h2>
+      <div class="sub">儲存於瀏覽器 LocalStorage，可匯出 JSON 備份</div>
+    </div>
+    <button class="hist-close" onclick="closeHistorySidebar()" title="關閉">✕</button>
+  </div>
+  <div class="hist-search">
+    <input id="hist-search-input" type="text" placeholder="🔎 搜尋紀錄名稱 / Ref…"
+           oninput="renderHistorySidebar()">
+  </div>
+  <div class="hist-list" id="hist-list"></div>
+  <div class="hist-foot">
+    <button onclick="saveCurrentToHistory()" style="background:#16a34a;color:#fff;border-color:#15803d;">
+      💾 儲存目前
+    </button>
+    <button onclick="exportAllHistoryJSON()">📦 匯出全部</button>
+    <button onclick="triggerImportHistory()">📥 匯入 JSON</button>
+  </div>
+  <input id="hist-import-file" type="file" accept=".json,application/json"
+         style="display:none" onchange="onImportHistoryFile(this)">
+</aside>
+
 <div id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -495,10 +666,29 @@ function buildTables(days) {
           oninput="calcTotals()"></td>`;
       }
       if (key === 'hotel') {
+        // City row (text input per day)
+        let cityCells = '';
+        for(let d=0;d<n;d++) cityCells += `<td><input class="mi" type="text"
+          id="hotel_city_${d}" placeholder="城市 City"></td>`;
+        // Hotel name row (text input per day)
+        let hnameCells = '';
+        for(let d=0;d<n;d++) hnameCells += `<td><input class="mi" type="text"
+          id="hotel_name_${d}" placeholder="飯店 Hotel Name"></td>`;
+
         indHTML += `<tr class="${idx%2===0?'ev':''}">
           <td class="lc">${label}</td>
           <td class="rc" id="ir_${key}">–</td>
           ${dayCells}
+        </tr>
+        <tr class="hotelmeta">
+          <td class="lc">↳ 城市 City <span style="font-size:.55rem;opacity:.6;">(供日後資料庫使用)</span></td>
+          <td class="rc">city</td>
+          ${cityCells}
+        </tr>
+        <tr class="hotelmeta">
+          <td class="lc">↳ 飯店 Hotel Name</td>
+          <td class="rc">hotel</td>
+          ${hnameCells}
         </tr>
         <tr>
           <td class="lc" style="color:#7c3aed;font-size:.7rem;padding-left:20px;">
@@ -841,9 +1031,6 @@ function buildSheet(s, tabName) {
   const {n,pax,margin,sellFx,sharedTot,totalB,netPP,selling,profitPP,selGrp,profitPG,selUSD,grpUSD,focQty} = s;
   const days = getDays();
   const TW2 = ['日','一','二','三','四','五','六'];
-  const {n,pax,margin,sellFx,sharedTot,totalB,netPP,selling,profitPP,selGrp,profitPG,selUSD,grpUSD,focQty} = s;
-  const days = getDays();
-  const TW2 = ['日','一','二','三','四','五','六'];
 
   // ── colours ──
   const C = {
@@ -1016,6 +1203,50 @@ function buildSheet(s, tabName) {
   sc(R, 0, '住宿 Hotel', labelStyle(C.white));
   scN(R, 1, hotelTot, cellStyle('E8F0FB','1E293B',true));
   hotelVals.forEach((v,d)=>scN(R,COL_DAY0+d,v,cellStyle(C.white)));
+  R++;
+
+  // City row (future-DB field)
+  const cityVals = Array.from({length:n},(_,d)=>($(`hotel_city_${d}`)?.value)||'');
+  sc(R, 0, '  ↳ 城市 City', {
+    font:{italic:true,sz:8,color:{rgb:'92400E'},name:'Verdana'},
+    fill:{fgColor:{rgb:'FFFBEB'}},
+    alignment:{horizontal:'left',vertical:'center',indent:2},
+    border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}}}
+  });
+  sc(R, 1, 'city', {
+    font:{italic:true,sz:7,color:{rgb:'92400E'},name:'Verdana'},
+    fill:{fgColor:{rgb:'FEF3C7'}},
+    alignment:{horizontal:'center',vertical:'center'},
+  });
+  cityVals.forEach((v,d)=>sc(R, COL_DAY0+d, v, {
+    font:{sz:8,color:{rgb:'92400E'},name:'Verdana'},
+    fill:{fgColor:{rgb:'FFFBEB'}},
+    alignment:{horizontal:'center',vertical:'center',wrapText:true},
+    border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}},left:{style:'thin',color:{rgb:'E2E8F0'}},right:{style:'thin',color:{rgb:'E2E8F0'}}},
+    numFmt:'@'
+  }));
+  R++;
+
+  // Hotel name row (future-DB field)
+  const hnameVals = Array.from({length:n},(_,d)=>($(`hotel_name_${d}`)?.value)||'');
+  sc(R, 0, '  ↳ 飯店 Hotel Name', {
+    font:{italic:true,sz:8,color:{rgb:'92400E'},name:'Verdana'},
+    fill:{fgColor:{rgb:'FFFBEB'}},
+    alignment:{horizontal:'left',vertical:'center',indent:2},
+    border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}}}
+  });
+  sc(R, 1, 'hotel', {
+    font:{italic:true,sz:7,color:{rgb:'92400E'},name:'Verdana'},
+    fill:{fgColor:{rgb:'FEF3C7'}},
+    alignment:{horizontal:'center',vertical:'center'},
+  });
+  hnameVals.forEach((v,d)=>sc(R, COL_DAY0+d, v, {
+    font:{sz:8,color:{rgb:'92400E'},name:'Verdana'},
+    fill:{fgColor:{rgb:'FFFBEB'}},
+    alignment:{horizontal:'center',vertical:'center',wrapText:true},
+    border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}},left:{style:'thin',color:{rgb:'E2E8F0'}},right:{style:'thin',color:{rgb:'E2E8F0'}}},
+    numFmt:'@'
+  }));
   R++;
 
   // SRS
@@ -1196,8 +1427,9 @@ $('end-date').addEventListener('change',   onDateChange);
 $('ref').addEventListener('input', ()=>{ calcTotals(); updateTabName(); });
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
-initTabs();
-onDateChange();
+// (initTabs() and onDateChange() are invoked at the very end of the script,
+//  after all module-level `let` declarations are initialized — moved here from
+//  the original v11 to avoid a Temporal-Dead-Zone error on `tabCounter`.)
 // ─── MULTI-PAX COMPARISON ─────────────────────────────────────────────────────
 // Logic (CORRECTED):
 //   sharedTot = nonFocGroupCosts + FOC(=totalB)  [from _snap]
@@ -1347,6 +1579,11 @@ function collectTabData() {
     })),
     focQty: window.focQty || 1,
     lastN,
+    // Future DB fields — hotel metadata per day (city + hotel name)
+    hotelMeta: {
+      city: Array.from({length:lastN},(_,d)=>$(`hotel_city_${d}`)?.value||''),
+      name: Array.from({length:lastN},(_,d)=>$(`hotel_name_${d}`)?.value||''),
+    },
   };
   // collect grp inputs
   GRP_ITEMS.filter(g=>!g.isFOC).forEach(({key})=>{
@@ -1410,6 +1647,14 @@ function restoreTabData(data) {
     Object.entries(row.vals||{}).forEach(([d,v])=>{
       const cel=$(`ent_${row.id}_${d}`); if(cel) cel.value=v;
     });
+  });
+
+  // restore hotel meta (city / hotel name) — future-DB fields
+  (data.hotelMeta?.city||[]).forEach((v,d)=>{
+    const el=$(`hotel_city_${d}`); if(el) el.value = v||'';
+  });
+  (data.hotelMeta?.name||[]).forEach((v,d)=>{
+    const el=$(`hotel_name_${d}`); if(el) el.value = v||'';
   });
 
   calcTotals();
@@ -1541,6 +1786,386 @@ function initTabs() {
   activeTabId = 1;
   renderTabBar();
 }
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HISTORY (LocalStorage + JSON import/export)
+// ═════════════════════════════════════════════════════════════════════════════
+const HIST_KEY = 'tour_calc_history_v1';
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); }
+  catch(e) { console.warn('history load failed', e); return []; }
+}
+function writeHistory(arr) {
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(arr)); updateHistCount(); }
+  catch(e) { toast('⚠ 儲存失敗：' + (e.message || e)); }
+}
+function updateHistCount() {
+  const el = $('hist-count');
+  if (el) el.textContent = loadHistory().length;
+}
+
+function makeHistorySummary() {
+  const s = window._snap || {};
+  return {
+    ref:           sv('ref'),
+    startDate:     $('start-date')?.value || '',
+    endDate:       $('end-date')?.value || '',
+    days:          s.n || 0,
+    pax:           s.pax || 0,
+    netPP:         s.netPP || 0,
+    sellingPP:     s.selling || 0,
+    sellingPPUSD:  s.selUSD || 0,
+    sellingGroup:  s.selGrp || 0,
+    margin:        s.margin || 0,
+  };
+}
+
+function defaultSaveName() {
+  const ref = sv('ref');
+  const d = new Date();
+  const ts = d.getFullYear() + '-' +
+             String(d.getMonth()+1).padStart(2,'0') + '-' +
+             String(d.getDate()).padStart(2,'0') + ' ' +
+             String(d.getHours()).padStart(2,'0') + ':' +
+             String(d.getMinutes()).padStart(2,'0');
+  return ref ? (ref + ' [' + ts + ']') : ('未命名 ' + ts);
+}
+
+function saveCurrentToHistory() {
+  calcTotals();
+  const suggested = defaultSaveName();
+  const name = prompt('💾 存檔名稱：', suggested);
+  if (name === null) return;
+  const finalName = (name || '').trim() || suggested;
+  const hist = loadHistory();
+  const existingIdx = hist.findIndex(h => h.name === finalName);
+  const data    = collectTabData();
+  const summary = makeHistorySummary();
+  const nowIso  = new Date().toISOString();
+
+  if (existingIdx >= 0) {
+    const ok = confirm(
+      '已有同名紀錄「' + finalName + '」，是否覆蓋舊版本？\n' +
+      '・按【確定】= 覆蓋\n' +
+      '・按【取消】= 另存為新版本'
+    );
+    if (ok) {
+      hist[existingIdx] = {
+        ...hist[existingIdx],
+        name: finalName, data, summary, updatedAt: nowIso,
+      };
+      writeHistory(hist);
+      renderHistorySidebar();
+      toast('💾 已覆蓋：' + finalName);
+      return;
+    } else {
+      let n = 2;
+      while (hist.some(h => h.name === finalName + ' (' + n + ')')) n++;
+      const newName = finalName + ' (' + n + ')';
+      hist.unshift({
+        id: 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+        name: newName, data, summary,
+        savedAt: nowIso, updatedAt: nowIso,
+      });
+      writeHistory(hist);
+      renderHistorySidebar();
+      toast('💾 已另存：' + newName);
+      return;
+    }
+  }
+
+  hist.unshift({
+    id: 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    name: finalName, data, summary,
+    savedAt: nowIso, updatedAt: nowIso,
+  });
+  writeHistory(hist);
+  renderHistorySidebar();
+  toast('💾 已存檔：' + finalName);
+}
+
+function loadFromHistory(id) {
+  const hist = loadHistory();
+  const rec  = hist.find(h => h.id === id);
+  if (!rec) { toast('找不到紀錄'); return; }
+  if (!confirm('將「' + rec.name + '」載入到目前分頁，將會覆蓋目前分頁的內容。是否繼續？')) return;
+  restoreTabData(rec.data);
+  if (activeTabId !== null) {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (tab) { tab.name = rec.name; renderTabBar(); }
+  }
+  toast('📂 已載入：' + rec.name);
+  closeHistorySidebar();
+}
+
+function loadAsNewTab(id) {
+  const hist = loadHistory();
+  const rec  = hist.find(h => h.id === id);
+  if (!rec) { toast('找不到紀錄'); return; }
+  if (activeTabId !== null) {
+    const cur = tabs.find(t => t.id === activeTabId);
+    if (cur) cur.data = collectTabData();
+  }
+  tabCounter++;
+  const newId = tabCounter;
+  tabs.push({ id: newId, name: rec.name, data: rec.data });
+  switchTab(newId);
+  toast('🗂 已開啟新分頁：' + rec.name);
+  closeHistorySidebar();
+}
+
+function deleteHistory(id) {
+  const hist = loadHistory();
+  const rec  = hist.find(h => h.id === id);
+  if (!rec) return;
+  if (!confirm('確定刪除「' + rec.name + '」？\n此動作無法復原。')) return;
+  writeHistory(hist.filter(h => h.id !== id));
+  renderHistorySidebar();
+  toast('🗑 已刪除：' + rec.name);
+}
+
+function renameHistory(id) {
+  const hist = loadHistory();
+  const rec  = hist.find(h => h.id === id);
+  if (!rec) return;
+  const newName = prompt('✏ 新名稱：', rec.name);
+  if (newName === null) return;
+  const trimmed = (newName || '').trim();
+  if (!trimmed) return;
+  if (hist.some(h => h.id !== id && h.name === trimmed)) {
+    toast('⚠ 已有同名紀錄'); return;
+  }
+  rec.name = trimmed;
+  rec.updatedAt = new Date().toISOString();
+  writeHistory(hist);
+  renderHistorySidebar();
+  toast('✏ 已重命名');
+}
+
+function exportSingleHistoryJSON(id) {
+  const hist = loadHistory();
+  const rec  = hist.find(h => h.id === id);
+  if (!rec) return;
+  const safe = (rec.name || 'quote').replace(/[^a-zA-Z0-9一-鿿_-]/g,'_');
+  downloadJSON([rec], 'Quote_' + safe + '.json');
+  toast('📤 已匯出：' + rec.name);
+}
+
+function exportAllHistoryJSON() {
+  const hist = loadHistory();
+  if (!hist.length) { toast('沒有歷史紀錄可匯出'); return; }
+  downloadJSON(hist, 'QuoteHistory_' + new Date().toISOString().slice(0,10) + '.json');
+  toast('📦 已匯出 ' + hist.length + ' 筆紀錄');
+}
+
+function downloadJSON(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type:'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 400);
+}
+
+function triggerImportHistory() { $('hist-import-file')?.click(); }
+
+function onImportHistoryFile(input) {
+  if (!(input.files && input.files[0])) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      const hist = loadHistory();
+      let added = 0;
+      arr.forEach(rec => {
+        if (!rec || !rec.data) return;
+        let name = rec.name || defaultSaveName();
+        let n = 2; const base = name;
+        while (hist.some(h => h.name === name)) {
+          name = base + ' (' + n + ')'; n++;
+        }
+        hist.unshift({
+          id: 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+          name,
+          data: rec.data,
+          summary: rec.summary || {},
+          savedAt:   rec.savedAt   || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        added++;
+      });
+      writeHistory(hist);
+      renderHistorySidebar();
+      toast('📥 已匯入 ' + added + ' 筆紀錄');
+    } catch(err) {
+      toast('⚠ 匯入失敗：' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function renderHistorySidebar() {
+  const list = $('hist-list');
+  if (!list) return;
+  updateHistCount();
+  const q = ($('hist-search-input')?.value || '').trim().toLowerCase();
+  let hist = loadHistory();
+  hist.sort((a,b) => (b.updatedAt || b.savedAt || '').localeCompare(a.updatedAt || a.savedAt || ''));
+  if (q) {
+    hist = hist.filter(h =>
+      (h.name||'').toLowerCase().includes(q) ||
+      (h.summary?.ref||'').toLowerCase().includes(q));
+  }
+  if (!hist.length) {
+    list.innerHTML = '<div class="hist-empty">' +
+      (q ? '沒有符合「' + escapeHTML(q) + '」的紀錄'
+         : '尚無存檔。<br><br>按下「💾 存檔」開始建立第一筆。<br>或匯入既有的 JSON 備份。') +
+      '</div>';
+    return;
+  }
+  list.innerHTML = hist.map(h => {
+    const s  = h.summary || {};
+    const dt = formatHistTime(h.updatedAt || h.savedAt);
+    const dateRange = (s.startDate || '') + (s.endDate ? ' → ' + s.endDate : '');
+    const figs = [];
+    if (s.pax)            figs.push('<span>' + s.pax + ' pax</span>');
+    if (s.days)           figs.push('<span>' + s.days + 'D' + (s.days>1 ? '/' + (s.days-1) + 'N' : '') + '</span>');
+    if (s.netPP)          figs.push('<span class="net">Net ' + fmt(s.netPP) + '</span>');
+    if (s.sellingPP)      figs.push('<span class="sell">Sell ' + fmt(s.sellingPP) + '</span>');
+    if (s.sellingPPUSD)   figs.push('<span class="usd">USD ' + fmtD(s.sellingPPUSD) + '</span>');
+    return '<div class="hist-item">' +
+      '<div class="hi-name" title="' + escapeHTML(h.name) + '">' + escapeHTML(h.name) + '</div>' +
+      (dateRange ? '<div class="hi-meta">' + escapeHTML(dateRange) + '</div>' : '') +
+      (figs.length ? '<div class="hi-figs">' + figs.join('') + '</div>' : '') +
+      '<div class="hi-meta" style="opacity:.7;">存檔: ' + dt + '</div>' +
+      '<div class="hi-acts">' +
+        '<button class="hi-btn"        onclick="loadFromHistory(\'' + h.id + '\')"     title="載入到目前分頁">📂 載入</button>' +
+        '<button class="hi-btn newtab" onclick="loadAsNewTab(\''     + h.id + '\')"     title="開新分頁載入">🗂 新分頁</button>' +
+        '<button class="hi-btn rename" onclick="renameHistory(\''    + h.id + '\')"     title="重新命名">✏</button>' +
+        '<button class="hi-btn export" onclick="exportSingleHistoryJSON(\'' + h.id + '\')" title="匯出 JSON">📤</button>' +
+        '<button class="hi-btn del"    onclick="deleteHistory(\''    + h.id + '\')"     title="刪除">✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function formatHistTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const y = d.getFullYear(),
+        m = String(d.getMonth()+1).padStart(2,'0'),
+        day = String(d.getDate()).padStart(2,'0'),
+        hh = String(d.getHours()).padStart(2,'0'),
+        mm = String(d.getMinutes()).padStart(2,'0');
+  return y + '-' + m + '-' + day + ' ' + hh + ':' + mm;
+}
+
+function escapeHTML(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function openHistorySidebar() {
+  $('hist-sidebar')?.classList.add('open');
+  $('hist-sidebar')?.setAttribute('aria-hidden','false');
+  $('hist-backdrop')?.classList.add('show');
+  renderHistorySidebar();
+}
+function closeHistorySidebar() {
+  $('hist-sidebar')?.classList.remove('open');
+  $('hist-sidebar')?.setAttribute('aria-hidden','true');
+  $('hist-backdrop')?.classList.remove('show');
+}
+function toggleHistorySidebar() {
+  if ($('hist-sidebar')?.classList.contains('open')) closeHistorySidebar();
+  else openHistorySidebar();
+}
+
+// Ctrl/Cmd+S → save; Esc → close sidebar
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    saveCurrentToHistory();
+  } else if (e.key === 'Escape' && $('hist-sidebar')?.classList.contains('open')) {
+    closeHistorySidebar();
+  }
+});
+
+// ─── SAVE AS LOCAL FILE (Excel + JSON to default download folder) ─────────────
+function saveAsLocal() {
+  calcTotals();
+  const s = window._snap;
+  if (!s || (!s.netPP && !s.totalB && !s.sharedTot)) {
+    toast('⚠ 目前沒有資料可儲存');
+    return;
+  }
+  const ref = sv('ref') || 'tour';
+  const today = new Date();
+  const ymd = today.getFullYear() + '-' +
+              String(today.getMonth()+1).padStart(2,'0') + '-' +
+              String(today.getDate()).padStart(2,'0');
+  const safeRef = ref.replace(/[^a-zA-Z0-9一-鿿_-]/g,'_');
+  const suggested = 'Quote_' + safeRef + '_' + (s.pax||0) + 'pax_' + ymd;
+  const baseName = prompt(
+    '💼 另存新檔到本機\n\n檔名（不需副檔名，會同時下載 .xlsx 和 .json）：',
+    suggested
+  );
+  if (baseName === null) return;
+  const finalBase = ((baseName || '').trim() || suggested).replace(/[\\/:*?"<>|]/g,'_');
+
+  // ── 1. Excel ──
+  try {
+    const wb = XLSX.utils.book_new();
+    const tabName = (tabs.find(t=>t.id===activeTabId)?.name || 'Sheet')
+      .replace(/[^a-zA-Z0-9一-鿿 _-]/g,'').substring(0,30) || 'Cost Sheet';
+    const {ws, merges, totalCols, n} = buildSheet(s, tabName);
+    ws['!ref']    = XLSX.utils.encode_range({s:{r:0,c:0},e:{r:999,c:totalCols-1}});
+    ws['!merges'] = merges;
+    ws['!cols']   = [{wch:32},{wch:14},...Array(n).fill({wch:12})];
+    XLSX.utils.book_append_sheet(wb, ws, tabName);
+    XLSX.writeFile(wb, finalBase + '.xlsx');
+  } catch(e) {
+    toast('⚠ Excel 匯出失敗：' + e.message);
+    console.error(e);
+    return;
+  }
+
+  // ── 2. JSON (after a small delay so browser handles two downloads sequentially) ──
+  setTimeout(() => {
+    try {
+      const record = {
+        id: 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+        name: finalBase,
+        data:    collectTabData(),
+        summary: makeHistorySummary(),
+        savedAt:   new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      downloadJSON([record], finalBase + '.json');
+      toast('💼 已下載：' + finalBase + '.xlsx + .json');
+    } catch(e) {
+      toast('⚠ JSON 匯出失敗：' + e.message);
+      console.error(e);
+    }
+  }, 500);
+}
+
+// initialize count on load
+updateHistCount();
+renderHistorySidebar();
+
+// Now everything is in scope: kick off the original init.
+initTabs();
+onDateChange();
+updateHistCount();
+renderHistorySidebar();
 
 </script>
 </body>
